@@ -22,8 +22,14 @@ import io.airlift.compress.thirdparty.ZstdJniDecompressor;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
+import java.net.URL;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
+import java.util.Objects;
 
 import static java.nio.ByteOrder.LITTLE_ENDIAN;
 import static org.testng.Assert.assertEquals;
@@ -55,6 +61,34 @@ public class TestZstdBb
         return new ZstdJniDecompressor();
     }
 
+    @Test
+    public void testIncompressibleData()
+            throws IOException {
+        // Incompressible data that would require more than maxCompressedLength(...) to store
+
+        Compressor compressor = getCompressor();
+
+        byte[] original = readFileAsBytes("data/zstd/incompressible");
+        byte[] original = readFileAsByteBuffer("data/zstd/incompressible");
+        int maxCompressLength = compressor.maxCompressedLength(original.length);
+
+        // byte[] compressed = new byte[maxCompressLength];
+        var compressed = ByteBuffer.allocate(maxCompressLength);
+        int compressedSize = compressor.compress(original, 0, original.length, compressed, 0, compressed.length);
+
+        byte[] decompressed = new byte[original.length];
+        int decompressedSize = getDecompressor().decompress(compressed, 0, compressedSize, decompressed, 0, decompressed.length);
+
+        assertByteArraysEqual(original, 0, original.length, decompressed, 0, decompressedSize);
+    }
+    @Test
+    public void testMaxCompressedSize() {
+        assertEquals(new ZstdCompressorBb().maxCompressedLength(0), 64);
+        assertEquals(new ZstdCompressorBb().maxCompressedLength(64 * 1024), 65_824);
+        assertEquals(new ZstdCompressorBb().maxCompressedLength(128 * 1024), 131_584);
+        assertEquals(new ZstdCompressorBb().maxCompressedLength(128 * 1024 + 1), 131_585);
+    }
+
     // test over data sets, should the result depend on input size or its compressibility
     @Test(dataProvider = "data")
     public void testGetDecompressedSizeBB(DataSet dataSet) throws IOException {
@@ -77,5 +111,22 @@ public class TestZstdBb
         compressedWithPadding.rewind();
 
         assertEquals(ZstdDecompressorBb.getDecompressedSize(compressedWithPadding), originalUncompressed.length);
+    }
+
+    private byte[] readFileAsBytes(String path) throws IOException {
+        URL url = getClass().getClassLoader().getResource(path);
+        Objects.requireNonNull(url, path);
+        return Files.readAllBytes(Path.of(url.getFile()));
+    }
+    private ByteBuffer readFileAsByteBuffer(String path) throws IOException {
+        URL url = getClass().getClassLoader().getResource(path);
+        Objects.requireNonNull(url, path);
+        long size = Files.size(Path.of(url.getFile()));
+        assert size <= Integer.MAX_VALUE;
+        ByteBuffer contents = ByteBuffer.allocate((int) size).order(LITTLE_ENDIAN);
+        try (FileChannel fc = FileChannel.open(Path.of(url.getFile()), StandardOpenOption.READ)) {
+            fc.read(contents);
+        }
+        return contents;
     }
 }
