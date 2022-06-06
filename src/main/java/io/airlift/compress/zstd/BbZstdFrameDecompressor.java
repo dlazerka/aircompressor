@@ -959,7 +959,7 @@ class BbZstdFrameDecompressor
         return readFrameHeader(bb).contentSize;
     }
 
-    static int verifyMagic(ByteBuffer bb)
+    static void verifyMagic(ByteBuffer bb)
     {
         // verify(inputLimit - inputAddress >= 4, inputAddress, "Not enough input bytes");
         verify(bb.remaining() >= 4, bb.position(), "Not enough input bytes");
@@ -972,7 +972,5 @@ class BbZstdFrameDecompressor
             }
             throw new MalformedInputException(bb.position(), "Invalid magic prefix: " + Integer.toHexString(magic));
         }
-
-        return SIZE_OF_INT;
     }
 }

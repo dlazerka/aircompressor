@@ -20,7 +20,7 @@ class Constants
     public static final int SIZE_OF_INT = 4;
     public static final int SIZE_OF_LONG = 8;
 
-    public static final int MAGIC_NUMBER = 0xFD2FB528;
+    public static final int MAGIC_NUMBER = 0xFD2FB528; // -47205080
 
     public static final int MIN_WINDOW_LOG = 10;
     public static final int MAX_WINDOW_LOG = 31;
