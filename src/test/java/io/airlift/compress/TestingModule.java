@@ -38,17 +38,17 @@ public class TestingModule
     public List<DataSet> dataSets()
             throws NoSuchFieldException, IOException
     {
-        String[] testNames = DataSet.class
-                .getDeclaredField("name")
-                .getAnnotation(Param.class)
-                .value();
+        // String[] testNames = DataSet.class
+        //         .getDeclaredField("name")
+        //         .getAnnotation(Param.class)
+        //         .value();
 
         List<DataSet> result = new ArrayList<>();
-        for (String testName : testNames) {
-            DataSet entry = new DataSet(testName);
-            entry.loadFile();
-            result.add(entry);
-        }
+        // for (String testName : testNames) {
+        //     DataSet entry = new DataSet(testName);
+        //     entry.loadFile();
+        //     result.add(entry);
+        // }
 
         return result;
     }

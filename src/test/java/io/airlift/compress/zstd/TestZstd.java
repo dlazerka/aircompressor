@@ -13,6 +13,7 @@
  */
 package io.airlift.compress.zstd;
 
+import com.google.common.io.Files;
 import com.google.common.io.Resources;
 import io.airlift.compress.AbstractTestCompression;
 import io.airlift.compress.Compressor;
@@ -23,6 +24,7 @@ import io.airlift.compress.thirdparty.ZstdJniCompressor;
 import io.airlift.compress.thirdparty.ZstdJniDecompressor;
 import org.testng.annotations.Test;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 
@@ -166,13 +168,18 @@ public class TestZstd
 
     // test over data sets, should the result depend on input size or its compressibility
     @Test(dataProvider = "data")
-    public void testGetDecompressedSize(DataSet dataSet)
-    {
+    public void testGetDecompressedSize(DataSet dataSet) throws IOException {
         Compressor compressor = getCompressor();
         byte[] originalUncompressed = dataSet.getUncompressed();
         byte[] compressed = new byte[compressor.maxCompressedLength(originalUncompressed.length)];
 
         int compressedLength = compressor.compress(originalUncompressed, 0, originalUncompressed.length, compressed, 0, compressed.length);
+
+        File file = new File("src/test/resources/data/zstd/compressed", dataSet.getName());
+        // Files.write(compressed, file);
+
+        byte[] compressed2 = Files.toByteArray(file);
+        assertByteArraysEqual(compressed, 0, compressed.length, compressed2, 0, compressed2.length);
 
         assertEquals(ZstdDecompressor.getDecompressedSize(compressed, 0, compressedLength), originalUncompressed.length);
 
