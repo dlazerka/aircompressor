@@ -171,22 +171,24 @@ public class TestZstd
     public void testGetDecompressedSize(DataSet dataSet) throws IOException {
         Compressor compressor = getCompressor();
         byte[] originalUncompressed = dataSet.getUncompressed();
-        byte[] compressed = new byte[compressor.maxCompressedLength(originalUncompressed.length)];
-
-        int compressedLength = compressor.compress(originalUncompressed, 0, originalUncompressed.length, compressed, 0, compressed.length);
+        // byte[] compressed = new byte[compressor.maxCompressedLength(originalUncompressed.length)];
+        // int compressedLength = compressor.compress(originalUncompressed, 0, originalUncompressed.length, compressed, 0, compressed.length);
 
         File file = new File("src/test/resources/data/zstd/compressed", dataSet.getName());
         // Files.write(compressed, file);
 
         byte[] compressed2 = Files.toByteArray(file);
-        assertByteArraysEqual(compressed, 0, compressed.length, compressed2, 0, compressed2.length);
+        int compressedLength = compressed2.length;
+        assertByteArraysEqual(compressed2, 0, compressed2.length, compressed2, 0, compressed2.length);
 
-        assertEquals(ZstdDecompressor.getDecompressedSize(compressed, 0, compressedLength), originalUncompressed.length);
+        assertEquals(ZstdDecompressor.getDecompressedSize(compressed2, 0, compressedLength), originalUncompressed.length);
+        assertEquals(BbZstdDecompressor.getDecompressedSize(compressed2, 0, compressedLength), originalUncompressed.length);
 
         int padding = 10;
         byte[] compressedWithPadding = new byte[compressedLength + padding];
         Arrays.fill(compressedWithPadding, (byte) 42);
-        System.arraycopy(compressed, 0, compressedWithPadding, padding, compressedLength);
+        System.arraycopy(compressed2, 0, compressedWithPadding, padding, compressedLength);
         assertEquals(ZstdDecompressor.getDecompressedSize(compressedWithPadding, padding, compressedLength), originalUncompressed.length);
+        assertEquals(BbZstdDecompressor.getDecompressedSize(compressedWithPadding, padding, compressedLength), originalUncompressed.length);
     }
 }

@@ -19,9 +19,9 @@ import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
 public class BbZstdDecompressor
-        // implements Decompressor
+        extends ZstdDecompressor
 {
-    private final BbZstdFrameDecompressor decompressor = new BbZstdFrameDecompressor();
+    // private final BbZstdFrameDecompressor decompressor = new BbZstdFrameDecompressor();
 
     public static long getDecompressedSize(ByteBuffer bb)
     {

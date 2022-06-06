@@ -101,80 +101,105 @@ class BbZstdFrameDecompressor
     private final FseTableReader fse = new FseTableReader();
 
     public int decompress(
-            final Object inputBase,
-            final long inputAddress,
-            final long inputLimit,
-            final Object outputBase,
-            final long outputAddress,
-            final long outputLimit)
-    {
-        if (outputAddress == outputLimit) {
+            final ByteBuffer inputBase,
+            final ByteBuffer outputBase
+    ) {
+        // if (outputAddress == outputLimit) {
+        if (!inputBase.hasRemaining()) {
             return 0;
         }
 
-        long input = inputAddress;
-        long output = outputAddress;
+        int inputAddress = inputBase.position();
+        int outputAddress = outputBase.position();
 
-        while (input < inputLimit) {
+        // long input = inputAddress;
+        // long output = outputAddress;
+
+        while (inputBase.hasRemaining()) {
             reset();
-            long outputStart = output;
-            input += verifyMagic(inputBase, inputAddress, inputLimit);
+            int outputStart = outputBase.position();
+            verifyMagic(inputBase);
 
-            FrameHeader frameHeader = readFrameHeader(inputBase, input, inputLimit);
-            input += frameHeader.headerSize;
+            FrameHeader frameHeader = readFrameHeader(inputBase);
+            // input += frameHeader.headerSize;
 
             boolean lastBlock;
             do {
-                verify(input + SIZE_OF_BLOCK_HEADER <= inputLimit, input, "Not enough input bytes");
+                verify(inputBase.remaining() >= SIZE_OF_BLOCK_HEADER, inputBase.position(), "Not enough input bytes");
 
                 // read block header
-                int header = UNSAFE.getInt(inputBase, input) & 0xFF_FFFF;
-                input += SIZE_OF_BLOCK_HEADER;
+                // int header = UNSAFE.getInt(inputBase, input) & 0xFF_FFFF;
+                int header = inputBase.getInt() & 0xFF_FFFF;
+                // input += SIZE_OF_BLOCK_HEADER;
 
                 lastBlock = (header & 1) != 0;
                 int blockType = (header >>> 1) & 0b11;
                 int blockSize = (header >>> 3) & 0x1F_FFFF; // 21 bits
 
-                int decodedSize;
+                // TODO: below not converted
+                long inputLimit = 0;
+                // long inputBase = 0;
+                // int decodedSize;
                 switch (blockType) {
                     case RAW_BLOCK:
-                        verify(inputAddress + blockSize <= inputLimit, input, "Not enough input bytes");
-                        decodedSize = decodeRawBlock(inputBase, input, blockSize, outputBase, output, outputLimit);
-                        input += blockSize;
+                        verify(inputAddress + blockSize <= inputLimit, inputBase.position(), "Not enough input bytes");
+                        // decodedSize = decodeRawBlock(inputBase, input, blockSize, outputBase, output, outputLimit);
+                        decodeRawBlock(inputBase, outputBase, blockSize);
+                        // decodeRawBlock(inputBase, outputBase.slice(outputBase.position(), blockSize));
+                        // input += blockSize;
                         break;
                     case RLE_BLOCK:
-                        verify(inputAddress + 1 <= inputLimit, input, "Not enough input bytes");
-                        decodedSize = decodeRleBlock(blockSize, inputBase, input, outputBase, output, outputLimit);
-                        input += 1;
+                        verify(inputAddress + 1 <= inputLimit, inputBase.position(), "Not enough input bytes");
+                        // decodedSize = decodeRleBlock(blockSize, inputBase, inputBase.position(), outputBase, output, outputLimit);
+                        decodeRleBlock(
+                                blockSize,
+                                inputBase,
+                                inputBase.position(),
+                                outputBase,
+                                outputBase.position(),
+                                outputBase.remaining());
+                        // input += 1;
                         break;
                     case COMPRESSED_BLOCK:
-                        verify(inputAddress + blockSize <= inputLimit, input, "Not enough input bytes");
-                        decodedSize = decodeCompressedBlock(inputBase, input, blockSize, outputBase, output, outputLimit, frameHeader.windowSize, outputAddress);
-                        input += blockSize;
+                        verify(inputAddress + blockSize <= inputLimit, inputBase.position(), "Not enough input bytes");
+                        // decodedSize = decodeCompressedBlock(inputBase, inputBase.position(), blockSize, outputBase, output, outputLimit, frameHeader.windowSize, outputAddress);
+                        // input += blockSize;
+                        decodeCompressedBlock(
+                                inputBase,
+                                inputBase.position(),
+                                blockSize,
+                                outputBase,
+                                outputBase.position(),
+                                outputBase.remaining(),
+                                frameHeader.windowSize,
+                                outputAddress);
                         break;
                     default:
-                        throw fail(input, "Invalid block type");
+                        throw fail(inputBase.position(), "Invalid block type");
                 }
 
-                output += decodedSize;
+                // output += decodedSize;
             }
             while (!lastBlock);
 
             if (frameHeader.hasChecksum) {
-                int decodedFrameSize = (int) (output - outputStart);
+                // int decodedFrameSize = (int) (output - outputStart);
+                int decodedFrameSize = outputBase.position() - outputStart;
 
                 long hash = XxHash64.hash(0, outputBase, outputStart, decodedFrameSize);
 
-                int checksum = UNSAFE.getInt(inputBase, input);
+                int checksum = inputBase.getInt();
+                // int checksum = UNSAFE.getInt(inputBase, input);
                 if (checksum != (int) hash) {
-                    throw new MalformedInputException(input, String.format("Bad checksum. Expected: %s, actual: %s", Integer.toHexString(checksum), Integer.toHexString((int) hash)));
+                    throw new MalformedInputException(inputBase.position(), String.format("Bad checksum. Expected: %s, actual: %s", Integer.toHexString(checksum), Integer.toHexString((int) hash)));
                 }
 
-                input += SIZE_OF_INT;
+                // input += SIZE_OF_INT;
             }
         }
 
-        return (int) (output - outputAddress);
+        // return (int) (output - outputAddress);
+        return outputBase.position() - outputAddress;
     }
 
     private void reset()
@@ -188,15 +213,21 @@ class BbZstdFrameDecompressor
         currentMatchLengthTable = null;
     }
 
-    private static int decodeRawBlock(Object inputBase, long inputAddress, int blockSize, Object outputBase, long outputAddress, long outputLimit)
-    {
-        verify(outputAddress + blockSize <= outputLimit, inputAddress, "Output buffer too small");
+    // private static int decodeRawBlock(Object inputBase, long inputAddress, int blockSize, Object outputBase, long outputAddress, long outputLimit)
+    // {
+    //     verify(outputAddress + blockSize <= outputLimit, inputAddress, "Output buffer too small");
+    //
+    //     UNSAFE.copyMemory(inputBase, inputAddress, outputBase, outputAddress, blockSize);
+    //     return blockSize;
+    // }
+    private static void decodeRawBlock(ByteBuffer inputBase, ByteBuffer outputBase, int blockSize) {
+        verify(outputBase.hasRemaining(), inputBase.position(), "Output buffer too small");
 
-        UNSAFE.copyMemory(inputBase, inputAddress, outputBase, outputAddress, blockSize);
-        return blockSize;
+        outputBase.put(outputBase.position(), inputBase, inputBase.position(), blockSize);
+        outputBase.position(outputBase.position() + blockSize);
     }
 
-    private static int decodeRleBlock(int size, Object inputBase, long inputAddress, Object outputBase, long outputAddress, long outputLimit)
+    private static int decodeRleBlock(int size, ByteBuffer inputBase, long inputAddress, ByteBuffer outputBase, long outputAddress, long outputLimit)
     {
         verify(outputAddress + size <= outputLimit, inputAddress, "Output buffer too small");
 
