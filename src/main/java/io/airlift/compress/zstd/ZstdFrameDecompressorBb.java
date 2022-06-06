@@ -24,7 +24,7 @@ import static io.airlift.compress.zstd.UnsafeUtil.UNSAFE;
 import static io.airlift.compress.zstd.Util.*;
 import static sun.misc.Unsafe.ARRAY_BYTE_BASE_OFFSET;
 
-class BbZstdFrameDecompressor
+class ZstdFrameDecompressorBb
 {
     private static final int[] DEC_32_TABLE = {4, 1, 2, 1, 4, 4, 4, 4};
     private static final int[] DEC_64_TABLE = {0, 0, 0, -1, 0, 1, 2, 3};

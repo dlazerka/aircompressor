@@ -18,14 +18,14 @@ import java.nio.ByteBuffer;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
-public class BbZstdDecompressor
+public class ZstdDecompressorBb
         extends ZstdDecompressor
 {
     // private final BbZstdFrameDecompressor decompressor = new BbZstdFrameDecompressor();
 
     public static long getDecompressedSize(ByteBuffer bb)
     {
-        return BbZstdFrameDecompressor.getDecompressedSize(bb);
+        return ZstdFrameDecompressorBb.getDecompressedSize(bb);
     }
 
     private static void verifyRange(byte[] data, int offset, int length)
