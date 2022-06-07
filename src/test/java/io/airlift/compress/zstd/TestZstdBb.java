@@ -27,37 +27,32 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.Objects;
 
 import static java.nio.ByteOrder.LITTLE_ENDIAN;
+import static java.nio.file.StandardOpenOption.READ;
 import static org.testng.Assert.assertEquals;
 
 public class TestZstdBb
-        extends AbstractTestCompression
-{
+        extends AbstractTestCompression {
     @Override
-    protected Compressor getCompressor()
-    {
+    protected Compressor getCompressor() {
         return new ZstdCompressorBb();
     }
 
     @Override
-    protected Decompressor getDecompressor()
-    {
+    protected Decompressor getDecompressor() {
         return new ZstdDecompressorBb();
     }
 
     @Override
-    protected Compressor getVerifyCompressor()
-    {
+    protected Compressor getVerifyCompressor() {
         return new ZstdJniCompressor(3);
     }
 
     @Override
-    protected Decompressor getVerifyDecompressor()
-    {
+    protected Decompressor getVerifyDecompressor() {
         return new ZstdJniDecompressor();
     }
 
@@ -68,19 +63,24 @@ public class TestZstdBb
 
         Compressor compressor = getCompressor();
 
-        byte[] original = readFileAsBytes("data/zstd/incompressible");
-        byte[] original = readFileAsByteBuffer("data/zstd/incompressible");
-        int maxCompressLength = compressor.maxCompressedLength(original.length);
+        // byte[] original = readFileAsBytes("data/zstd/incompressible");
+        ByteBuffer original = readFileAsByteBuffer("data/zstd/incompressible");
+        int maxCompressLength = compressor.maxCompressedLength(original.remaining());
 
         // byte[] compressed = new byte[maxCompressLength];
         var compressed = ByteBuffer.allocate(maxCompressLength);
-        int compressedSize = compressor.compress(original, 0, original.length, compressed, 0, compressed.length);
+        compressor.compress(original, compressed);
+        original.rewind();
+        compressed.flip();
 
-        byte[] decompressed = new byte[original.length];
-        int decompressedSize = getDecompressor().decompress(compressed, 0, compressedSize, decompressed, 0, decompressed.length);
+        // byte[] decompressed = new byte[original.length];
+        ByteBuffer decompressed = ByteBuffer.allocate(original.capacity());
+        getDecompressor().decompress(compressed, decompressed);
+        decompressed.flip();
 
-        assertByteArraysEqual(original, 0, original.length, decompressed, 0, decompressedSize);
+        assertByteArraysEqual(original.array(), 0, original.remaining(), decompressed.array(), 0, decompressed.remaining());
     }
+
     @Test
     public void testMaxCompressedSize() {
         assertEquals(new ZstdCompressorBb().maxCompressedLength(0), 64);
@@ -113,18 +113,34 @@ public class TestZstdBb
         assertEquals(ZstdDecompressorBb.getDecompressedSize(compressedWithPadding), originalUncompressed.length);
     }
 
-    private byte[] readFileAsBytes(String path) throws IOException {
+    private Path getResourceAsPath(String path) {
         URL url = getClass().getClassLoader().getResource(path);
         Objects.requireNonNull(url, path);
-        return Files.readAllBytes(Path.of(url.getFile()));
+        return Path.of(url.getFile());
     }
-    private ByteBuffer readFileAsByteBuffer(String path) throws IOException {
-        URL url = getClass().getClassLoader().getResource(path);
-        Objects.requireNonNull(url, path);
-        long size = Files.size(Path.of(url.getFile()));
+
+    private ByteBuffer readFileAsByteBuffer(String filePath) throws IOException {
+        Path path = getResourceAsPath(filePath);
+        long size = Files.size(path);
         assert size <= Integer.MAX_VALUE;
+
         ByteBuffer contents = ByteBuffer.allocate((int) size).order(LITTLE_ENDIAN);
-        try (FileChannel fc = FileChannel.open(Path.of(url.getFile()), StandardOpenOption.READ)) {
+
+        try (FileChannel fc = FileChannel.open(path, READ)) {
+            fc.read(contents);
+        }
+        contents.rewind();
+        return contents;
+    }
+
+    private ByteBuffer readFileAsByteBufferDirect(String filePath, boolean direct) throws IOException {
+        Path path = getResourceAsPath(filePath);
+        long size = Files.size(path);
+        assert size <= Integer.MAX_VALUE;
+
+        ByteBuffer contents = ByteBuffer.allocateDirect((int) size).order(LITTLE_ENDIAN);
+
+        try (FileChannel fc = FileChannel.open(path, READ)) {
             fc.read(contents);
         }
         return contents;
