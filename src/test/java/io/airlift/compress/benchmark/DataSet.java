@@ -13,14 +13,14 @@
  */
 package io.airlift.compress.benchmark;
 
-import com.google.common.io.Files;
 import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 
-import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 @State(Scope.Thread)
 public class DataSet
@@ -109,7 +109,7 @@ public class DataSet
     public void loadFile()
             throws IOException
     {
-        uncompressed = Files.toByteArray(new File("testdata", name));
+        uncompressed = Files.readAllBytes(Path.of("testdata", name));
     }
 
     public byte[] getUncompressed()

@@ -22,22 +22,17 @@ import io.airlift.compress.thirdparty.ZstdJniDecompressor;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
-import java.net.URL;
 import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Arrays;
-import java.util.Objects;
 
+import static io.airlift.compress.Util.readResourceAsByteBuffer;
 import static java.nio.ByteOrder.LITTLE_ENDIAN;
-import static java.nio.file.StandardOpenOption.READ;
 import static org.testng.Assert.assertEquals;
 
 public class TestZstdBb
         extends AbstractTestCompression {
     @Override
-    protected Compressor getCompressor() {
+    protected ZstdCompressorBb getCompressor() {
         return new ZstdCompressorBb();
     }
 
@@ -56,6 +51,38 @@ public class TestZstdBb
         return new ZstdJniDecompressor();
     }
 
+    @Test(dataProvider = "data")
+    @Override
+    public void testCompress(DataSet testCase) {
+        ZstdCompressorBb compressor = getCompressor();
+
+        byte[] originalUncompressed2 = testCase.getUncompressed();
+        ByteBuffer originalUncompressed = ByteBuffer.wrap(originalUncompressed2).order(LITTLE_ENDIAN);
+        int maxCompressedLength = compressor.maxCompressedLength(originalUncompressed.remaining());
+        ByteBuffer compressed = ByteBuffer.allocate(maxCompressedLength).order(LITTLE_ENDIAN);
+
+        // attempt to compress slightly different data to ensure the compressor doesn't keep state
+        // between calls that may affect results
+        if (originalUncompressed.remaining() > 1) {
+            // byte[] output = new byte[compressor.maxCompressedLength(originalUncompressed.length - 1)];
+            int maxCompressedLengthTmp = compressor.maxCompressedLength(originalUncompressed.remaining() - 1);
+            ByteBuffer outputTmp = ByteBuffer.allocate(maxCompressedLengthTmp).order(LITTLE_ENDIAN);
+            // compressor.compress(originalUncompressed, 1, originalUncompressed.length - 1, output, 0, output.length);
+            originalUncompressed.position(1);
+
+            compressor.compress(originalUncompressed, outputTmp);
+            originalUncompressed.rewind();
+        }
+
+        compressor.compress(originalUncompressed, compressed);
+
+        verifyCompressedData(
+                originalUncompressed.array(),
+                compressed.array(),
+                compressed.position()
+        );
+    }
+
     @Test
     public void testIncompressibleData()
             throws IOException {
@@ -63,8 +90,7 @@ public class TestZstdBb
 
         Compressor compressor = getCompressor();
 
-        // byte[] original = readFileAsBytes("data/zstd/incompressible");
-        ByteBuffer original = readFileAsByteBuffer("data/zstd/incompressible");
+        ByteBuffer original = readResourceAsByteBuffer("data/zstd/incompressible");
         int maxCompressLength = compressor.maxCompressedLength(original.remaining());
 
         // byte[] compressed = new byte[maxCompressLength];
@@ -113,36 +139,5 @@ public class TestZstdBb
         assertEquals(ZstdDecompressorBb.getDecompressedSize(compressedWithPadding), originalUncompressed.length);
     }
 
-    private Path getResourceAsPath(String path) {
-        URL url = getClass().getClassLoader().getResource(path);
-        Objects.requireNonNull(url, path);
-        return Path.of(url.getFile());
-    }
 
-    private ByteBuffer readFileAsByteBuffer(String filePath) throws IOException {
-        Path path = getResourceAsPath(filePath);
-        long size = Files.size(path);
-        assert size <= Integer.MAX_VALUE;
-
-        ByteBuffer contents = ByteBuffer.allocate((int) size).order(LITTLE_ENDIAN);
-
-        try (FileChannel fc = FileChannel.open(path, READ)) {
-            fc.read(contents);
-        }
-        contents.rewind();
-        return contents;
-    }
-
-    private ByteBuffer readFileAsByteBufferDirect(String filePath, boolean direct) throws IOException {
-        Path path = getResourceAsPath(filePath);
-        long size = Files.size(path);
-        assert size <= Integer.MAX_VALUE;
-
-        ByteBuffer contents = ByteBuffer.allocateDirect((int) size).order(LITTLE_ENDIAN);
-
-        try (FileChannel fc = FileChannel.open(path, READ)) {
-            fc.read(contents);
-        }
-        return contents;
-    }
 }

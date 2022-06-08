@@ -23,12 +23,9 @@ import io.airlift.compress.thirdparty.ZstdJniDecompressor;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
-import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Arrays;
-import java.util.Objects;
 
+import static io.airlift.compress.Util.readResourceAsBytes;
 import static org.testng.Assert.assertEquals;
 
 public class TestZstd
@@ -60,8 +57,8 @@ public class TestZstd
             throws IOException {
         int padding = 1021;
 
-        byte[] compressed = readFileAsBytes("data/zstd/with-checksum.zst");
-        byte[] uncompressed = readFileAsBytes("data/zstd/with-checksum");
+        byte[] compressed = readResourceAsBytes("data/zstd/with-checksum.zst");
+        byte[] uncompressed = readResourceAsBytes("data/zstd/with-checksum");
 
         byte[] output = new byte[uncompressed.length + padding * 2]; // pre + post padding
         int decompressedSize = getDecompressor().decompress(compressed, 0, compressed.length, output, padding, output.length - padding);
@@ -72,8 +69,8 @@ public class TestZstd
     @Test
     public void testConcatenatedFrames()
             throws IOException {
-        byte[] compressed = readFileAsBytes("data/zstd/multiple-frames.zst");
-        byte[] uncompressed = readFileAsBytes("data/zstd/multiple-frames");
+        byte[] compressed = readResourceAsBytes("data/zstd/multiple-frames.zst");
+        byte[] uncompressed = readResourceAsBytes("data/zstd/multiple-frames");
 
         byte[] output = new byte[uncompressed.length];
         getDecompressor().decompress(compressed, 0, compressed.length, output, 0, output.length);
@@ -84,7 +81,7 @@ public class TestZstd
     @Test(expectedExceptions = MalformedInputException.class, expectedExceptionsMessageRegExp = "Input is corrupted: offset=894")
     public void testInvalidSequenceOffset()
             throws IOException {
-        byte[] compressed = readFileAsBytes("data/zstd/offset-before-start.zst");
+        byte[] compressed = readResourceAsBytes("data/zstd/offset-before-start.zst");
         byte[] output = new byte[compressed.length * 10];
 
         getDecompressor().decompress(compressed, 0, compressed.length, output, 0, output.length);
@@ -97,7 +94,7 @@ public class TestZstd
         // which ended up emitting raw literals due to insufficient gain
         Compressor compressor = getCompressor();
 
-        byte[] original = readFileAsBytes("data/zstd/small-literals-after-incompressible-literals");
+        byte[] original = readResourceAsBytes("data/zstd/small-literals-after-incompressible-literals");
         int maxCompressLength = compressor.maxCompressedLength(original.length);
 
         byte[] compressed = new byte[maxCompressLength];
@@ -116,7 +113,7 @@ public class TestZstd
 
         Compressor compressor = getCompressor();
 
-        byte[] original = readFileAsBytes("data/zstd/large-rle");
+        byte[] original = readResourceAsBytes("data/zstd/large-rle");
         int maxCompressLength = compressor.maxCompressedLength(original.length);
 
         byte[] compressed = new byte[maxCompressLength];
@@ -135,7 +132,7 @@ public class TestZstd
 
         Compressor compressor = getCompressor();
 
-        byte[] original = readFileAsBytes("data/zstd/incompressible");
+        byte[] original = readResourceAsBytes("data/zstd/incompressible");
         int maxCompressLength = compressor.maxCompressedLength(original.length);
 
         byte[] compressed = new byte[maxCompressLength];
@@ -172,11 +169,5 @@ public class TestZstd
         Arrays.fill(compressedWithPadding, (byte) 42);
         System.arraycopy(compressed, 0, compressedWithPadding, padding, compressedLength);
         assertEquals(ZstdDecompressor.getDecompressedSize(compressedWithPadding, padding, compressedLength), originalUncompressed.length);
-    }
-
-    private byte[] readFileAsBytes(String path) throws IOException {
-        URL url = getClass().getClassLoader().getResource(path);
-        Objects.requireNonNull(url, path);
-        return Files.readAllBytes(Path.of(url.getFile()));
     }
 }

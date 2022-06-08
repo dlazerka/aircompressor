@@ -512,7 +512,7 @@ public abstract class AbstractTestCompression
         assertByteBufferEqual(expected.duplicate(), uncompressed);
     }
 
-    private void verifyCompressedData(byte[] originalUncompressed, byte[] compressed, int compressedLength)
+    protected void verifyCompressedData(byte[] originalUncompressed, byte[] compressed, int compressedLength)
     {
         byte[] uncompressed = new byte[originalUncompressed.length];
         int uncompressedSize = getVerifyDecompressor().decompress(compressed, 0, compressedLength, uncompressed, 0, uncompressed.length);

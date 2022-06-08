@@ -13,29 +13,74 @@
  */
 package io.airlift.compress;
 
-import static java.lang.String.format;
+import java.io.IOException;
+import java.net.URL;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Objects;
 
-public final class Util
-{
-    private Util()
-    {
+import static java.lang.String.format;
+import static java.nio.ByteOrder.LITTLE_ENDIAN;
+import static java.nio.file.StandardOpenOption.READ;
+
+public final class Util {
+    private Util() {
     }
 
-    public static String toHumanReadableSpeed(long bytesPerSecond)
-    {
+    public static String toHumanReadableSpeed(long bytesPerSecond) {
         String humanReadableSpeed;
         if (bytesPerSecond < 1024 * 10L) {
             humanReadableSpeed = format("%dB/s", bytesPerSecond);
-        }
-        else if (bytesPerSecond < 1024 * 1024 * 10L) {
+        } else if (bytesPerSecond < 1024 * 1024 * 10L) {
             humanReadableSpeed = format("%.1fkB/s", bytesPerSecond / 1024.0f);
-        }
-        else if (bytesPerSecond < 1024 * 1024 * 1024 * 10L) {
+        } else if (bytesPerSecond < 1024 * 1024 * 1024 * 10L) {
             humanReadableSpeed = format("%.1fMB/s", bytesPerSecond / (1024.0f * 1024.0f));
-        }
-        else {
+        } else {
             humanReadableSpeed = format("%.1fGB/s", bytesPerSecond / (1024.0f * 1024.0f * 1024.0f));
         }
         return humanReadableSpeed;
     }
+
+    static Path getResourceAsPath(String path) {
+        URL url = Util.class.getClassLoader().getResource(path);
+        Objects.requireNonNull(url, path);
+        return Path.of(url.getFile());
+    }
+
+    /** Reads "file" from classloader, as opposed to from filesystem */
+    public static byte[] readResourceAsBytes(String resourcePath) throws IOException {
+        Path path = getResourceAsPath(resourcePath);
+        return Files.readAllBytes(path);
+    }
+
+    /** Reads "file" from classloader, as opposed to from filesystem */
+    public static ByteBuffer readResourceAsByteBuffer(String filePath) throws IOException {
+        Path path = getResourceAsPath(filePath);
+        long size = Files.size(path);
+        assert size <= Integer.MAX_VALUE;
+
+        ByteBuffer contents = ByteBuffer.allocate((int) size).order(LITTLE_ENDIAN);
+
+        try (FileChannel fc = FileChannel.open(path, READ)) {
+            fc.read(contents);
+        }
+        contents.rewind();
+        return contents;
+    }
+
+    // /** Reads "file" from classloader, as opposed to from filesystem */
+    // private ByteBuffer readFileAsByteBufferDirect(String filePath, boolean direct) throws IOException {
+    //     Path path = getResourceAsPath(filePath);
+    //     long size = Files.size(path);
+    //     assert size <= Integer.MAX_VALUE;
+    //
+    //     ByteBuffer contents = ByteBuffer.allocateDirect((int) size).order(LITTLE_ENDIAN);
+    //
+    //     try (FileChannel fc = FileChannel.open(path, READ)) {
+    //         fc.read(contents);
+    //     }
+    //     return contents;
+    // }
 }

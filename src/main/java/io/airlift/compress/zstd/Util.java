@@ -15,6 +15,8 @@ package io.airlift.compress.zstd;
 
 import io.airlift.compress.MalformedInputException;
 
+import java.nio.ByteBuffer;
+
 import static io.airlift.compress.zstd.Constants.SIZE_OF_SHORT;
 import static io.airlift.compress.zstd.UnsafeUtil.UNSAFE;
 
@@ -78,6 +80,12 @@ final class Util
     {
         UNSAFE.putShort(outputBase, outputAddress, (short) value);
         UNSAFE.putByte(outputBase, outputAddress + SIZE_OF_SHORT, (byte) (value >>> Short.SIZE));
+    }
+
+    public static void put24BitLittleEndianBb(ByteBuffer outputBase, int value)
+    {
+        outputBase.putShort(4, (short) value);
+        outputBase.put((byte) (value >>> Short.SIZE));
     }
 
     // provides the minimum logSize to safely represent a distribution
