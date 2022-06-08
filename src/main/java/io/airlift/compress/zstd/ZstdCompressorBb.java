@@ -56,8 +56,17 @@ public class ZstdCompressorBb
         return ZstdFrameCompressorBb.compress(inputBb, inputAddress, inputAddress + inputLength, outputBb, outputAddress, outputAddress + maxOutputLength, CompressionParameters.DEFAULT_COMPRESSION_LEVEL);
     }
 
+
     @Override
-    public void compress(ByteBuffer inputBuffer, ByteBuffer outputBuffer)
+    public void compress(ByteBuffer inputBuffer, ByteBuffer outputBuffer) {
+        ZstdFrameCompressorBb.compress(
+                inputBuffer, inputBuffer.position(), inputBuffer.limit(),
+                outputBuffer, outputBuffer.position(), outputBuffer.limit(),
+                CompressionParameters.DEFAULT_COMPRESSION_LEVEL);
+        // return ZstdFrameCompressorBb.compress(inputBuffer, outputBuffer, CompressionParameters.DEFAULT_COMPRESSION_LEVEL);
+    }
+
+    public void compressOld(ByteBuffer inputBuffer, ByteBuffer outputBuffer)
     {
         // Java 9+ added an overload of various methods in ByteBuffer. When compiling with Java 11+ and targeting Java 8 bytecode
         // the resulting signatures are invalid for JDK 8, so accesses below result in NoSuchMethodError. Accessing the

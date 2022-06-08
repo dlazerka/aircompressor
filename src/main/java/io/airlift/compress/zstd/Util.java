@@ -84,7 +84,7 @@ final class Util
 
     public static void put24BitLittleEndianBb(ByteBuffer outputBase, int value)
     {
-        outputBase.putShort(4, (short) value);
+        outputBase.putShort((short) value);
         outputBase.put((byte) (value >>> Short.SIZE));
     }
 
