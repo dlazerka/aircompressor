@@ -13,14 +13,16 @@
  */
 package io.airlift.compress.zstd;
 
-import static io.airlift.compress.zstd.Constants.SIZE_OF_LONG;
-import static io.airlift.compress.zstd.UnsafeUtil.UNSAFE;
-import static sun.misc.Unsafe.ARRAY_BYTE_BASE_OFFSET;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
-class SequenceStore
+import static io.airlift.compress.zstd.Constants.SIZE_OF_LONG;
+import static java.nio.ByteOrder.LITTLE_ENDIAN;
+
+class SequenceStoreBb
 {
-    public final byte[] literalsBuffer;
-    public int literalsLength;
+    public final ByteBuffer literalsBuffer;
+    public int literalsLength; // TODO: change to literalsBuffer position or limit
 
     public final int[] offsets;
     public final int[] literalLengths;
@@ -57,7 +59,7 @@ class SequenceStore
                                                      42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42,
                                                      42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42};
 
-    public SequenceStore(int blockSize, int maxSequences)
+    public SequenceStoreBb(int blockSize, int maxSequences)
     {
         offsets = new int[maxSequences];
         literalLengths = new int[maxSequences];
@@ -67,30 +69,37 @@ class SequenceStore
         matchLengthCodes = new byte[maxSequences];
         offsetCodes = new byte[maxSequences];
 
-        literalsBuffer = new byte[blockSize];
+        // literalsBuffer = new byte[blockSize];
+        literalsBuffer = ByteBuffer.allocate(blockSize).order(LITTLE_ENDIAN);
 
         reset();
     }
 
-    public void appendLiterals(Object inputBase, long inputAddress, int inputSize)  {
-        UNSAFE.copyMemory(inputBase, inputAddress, literalsBuffer, ARRAY_BYTE_BASE_OFFSET + literalsLength, inputSize);
+    public void appendLiterals(ByteBuffer inputBase, int inputAddress, int inputSize)
+    {
+        // UNSAFE.copyMemory(inputBase, inputAddress, literalsBuffer, ARRAY_BYTE_BASE_OFFSET + literalsLength, inputSize);
+        literalsBuffer.put(literalsLength, inputBase, inputAddress, inputSize);
+        // inputBase.get(inputAddress, literalsBuffer, literalsLength, inputSize);
         literalsLength += inputSize;
     }
 
-    public void storeSequence(Object literalBase, long literalAddress, int literalLength, int offsetCode, int matchLengthBase)
+    public void storeSequence(ByteBuffer literalBase, int literalAddress, int literalLength, int offsetCode, int matchLengthBase)
     {
-        long input = literalAddress;
-        long output = ARRAY_BYTE_BASE_OFFSET + literalsLength;
+        int input = literalAddress;
+        // long output = ARRAY_BYTE_BASE_OFFSET + literalsLength;
+        int output = literalsLength; // TODO: change to literalsBuffer.position
         int copied = 0;
         do {
-            UNSAFE.putLong(literalsBuffer, output, UNSAFE.getLong(literalBase, input));
+            // UNSAFE.putLong(literalsBuffer, output, UNSAFE.getLong(literalBase, input));
+            literalsBuffer.putLong(output, literalBase.getLong(input));
             input += SIZE_OF_LONG;
             output += SIZE_OF_LONG;
             copied += SIZE_OF_LONG;
         }
         while (copied < literalLength);
 
-        literalsLength += literalLength;
+        // literalsLength += literalLength;
+        // literalsBuffer.position() is already updated
 
         if (literalLength > 65535) {
             longLengthField = LongField.LITERAL;
@@ -112,7 +121,8 @@ class SequenceStore
 
     public void reset()
     {
-        literalsLength = 0;
+        literalsBuffer.rewind();
+        // literalsLength = 0;
         sequenceCount = 0;
         longLengthField = null;
     }

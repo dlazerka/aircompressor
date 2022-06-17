@@ -47,8 +47,8 @@ public class ZstdCompressorBb
         verifyRange(input, inputOffset, inputLength);
         verifyRange(output, outputOffset, maxOutputLength);
 
-        long inputAddress = ARRAY_BYTE_BASE_OFFSET + inputOffset;
-        long outputAddress = ARRAY_BYTE_BASE_OFFSET + outputOffset;
+        int inputAddress = ARRAY_BYTE_BASE_OFFSET + inputOffset;
+        int outputAddress = ARRAY_BYTE_BASE_OFFSET + outputOffset;
 
         ByteBuffer inputBb = ByteBuffer.wrap(input, inputOffset, inputLength).order(LITTLE_ENDIAN);
         ByteBuffer outputBb = ByteBuffer.wrap(output, outputOffset, maxOutputLength).order(LITTLE_ENDIAN);

@@ -22,8 +22,7 @@ import static io.airlift.compress.zstd.UnsafeUtil.UNSAFE;
 import static io.airlift.compress.zstd.Util.*;
 import static sun.misc.Unsafe.ARRAY_BYTE_BASE_OFFSET;
 
-class ZstdFrameCompressorBb
-{
+class ZstdFrameCompressorBb {
     static final int MAX_FRAME_HEADER_SIZE = 14;
 
     private static final int CHECKSUM_FLAG = 0b100;
@@ -34,13 +33,16 @@ class ZstdFrameCompressorBb
     // the maximum table log allowed for literal encoding per RFC 8478, section 4.2.1
     private static final int MAX_HUFFMAN_TABLE_LOG = 11;
 
-    private ZstdFrameCompressorBb()
-    {
+    /**
+     * Original version had only one strategy DFAST, so just using it.
+     */
+    private final static DoubleFastBlockCompressorBb compressor = new DoubleFastBlockCompressorBb();
+
+    private ZstdFrameCompressorBb() {
     }
 
     // visible for testing
-    static void writeMagic(final ByteBuffer outputBase)
-    {
+    static void writeMagic(final ByteBuffer outputBase) {
         // checkArgument(outputLimit - outputAddress >= SIZE_OF_INT, "Output buffer too small");
         checkArgument(outputBase.remaining() >= SIZE_OF_INT, "Output buffer too small");
 
@@ -49,8 +51,7 @@ class ZstdFrameCompressorBb
     }
 
     // visible for testing
-    static void writeFrameHeader(final ByteBuffer outputBase, final long outputAddress, final long outputLimit, int inputSize, int windowSize)
-    {
+    static void writeFrameHeader(final ByteBuffer outputBase, final long outputAddress, final long outputLimit, int inputSize, int windowSize) {
         checkArgument(outputBase.remaining() >= MAX_FRAME_HEADER_SIZE, "Output buffer too small");
 
         int output = outputBase.position();
@@ -114,8 +115,7 @@ class ZstdFrameCompressorBb
     }
 
     // visible for testing
-    static void writeChecksum(ByteBuffer outputBase, long outputAddress, long outputLimit, ByteBuffer inputBase, long inputAddress, long inputLimit)
-    {
+    static void writeChecksum(ByteBuffer outputBase, long outputAddress, long outputLimit, ByteBuffer inputBase, long inputAddress, long inputLimit) {
         checkArgument(outputLimit - outputAddress >= SIZE_OF_INT, "Output buffer too small");
 
         int inputSize = (int) (inputLimit - inputAddress);
@@ -126,11 +126,14 @@ class ZstdFrameCompressorBb
         outputBase.putInt((int) hash);
     }
 
-    public static int compress(ByteBuffer inputBase, long inputAddress, long inputLimit, ByteBuffer outputBase, long outputAddress, long outputLimit, int compressionLevel)
-    {
+    public static int compress(ByteBuffer inputBase, int inputAddress, long inputLimit, ByteBuffer outputBase, int outputAddress, long outputLimit, int compressionLevel) {
         // int inputSize = (int) (inputLimit - inputAddress);
 
         CompressionParameters parameters = CompressionParameters.compute(compressionLevel, inputBase.remaining());
+        if (parameters.getStrategy() != CompressionParameters.Strategy.DFAST) {
+            // Same as in original aircompressor.
+            throw new UnsupportedOperationException("Only DFAST strategy is supported");
+        }
 
         int output = outputBase.position();
 
@@ -142,8 +145,7 @@ class ZstdFrameCompressorBb
         return (output - outputBase.position());
     }
 
-    private static int compressFrame(ByteBuffer inputBase, long inputAddress, long inputLimit, ByteBuffer outputBase, long outputAddress, long outputLimit, CompressionParameters parameters)
-    {
+    private static void compressFrame(ByteBuffer inputBase, int inputAddress, long inputLimit, ByteBuffer outputBase, long outputAddress, long outputLimit, CompressionParameters parameters) {
         int windowSize = 1 << parameters.getWindowLog(); // TODO: store window size in parameters directly?
         int blockSize = Math.min(MAX_BLOCK_SIZE, windowSize);
 
@@ -151,9 +153,9 @@ class ZstdFrameCompressorBb
         int remaining = (int) (inputLimit - inputAddress);
 
         long output = outputAddress;
-        long input = inputAddress;
+        int input = inputAddress;
 
-        CompressionContext context = new CompressionContext(parameters, inputAddress, remaining);
+        CompressionContextBb context = new CompressionContextBb(parameters, inputAddress, remaining);
 
         do {
             checkArgument(outputSize >= SIZE_OF_BLOCK_HEADER + MIN_BLOCK_SIZE, "Output buffer too small");
@@ -163,7 +165,16 @@ class ZstdFrameCompressorBb
 
             int compressedSize = 0;
             if (remaining > 0) {
-                compressedSize = compressBlock(inputBase, input, blockSize, outputBase, output + SIZE_OF_BLOCK_HEADER, outputSize - SIZE_OF_BLOCK_HEADER, context, parameters);
+                compressedSize = compressBlock(
+                        inputBase,
+                        input,
+                        blockSize,
+                        outputBase,
+                        output + SIZE_OF_BLOCK_HEADER,
+                        outputSize - SIZE_OF_BLOCK_HEADER,
+                        context,
+                        parameters
+                );
             }
 
             if (compressedSize == 0) { // block is not compressible
@@ -174,8 +185,7 @@ class ZstdFrameCompressorBb
                 // UNSAFE.copyMemory(inputBase, input, outputBase, output + SIZE_OF_BLOCK_HEADER, blockSize);
                 outputBase.put(outputBase.position(), inputBase, inputBase.position(), blockSize);
                 compressedSize = SIZE_OF_BLOCK_HEADER + blockSize;
-            }
-            else {
+            } else {
                 int blockHeader = lastBlockFlag | (COMPRESSED_BLOCK << 1) | (compressedSize << 3);
                 put24BitLittleEndian(outputBase, output, blockHeader);
                 compressedSize += SIZE_OF_BLOCK_HEADER;
@@ -187,12 +197,10 @@ class ZstdFrameCompressorBb
             outputSize -= compressedSize;
         }
         while (remaining > 0);
-
-        return (int) (output - outputAddress);
+        // return (int) (output - outputAddress);
     }
 
-    private static int compressBlock(Object inputBase, long inputAddress, int inputSize, Object outputBase, long outputAddress, int outputSize, CompressionContext context, CompressionParameters parameters)
-    {
+    private static int compressBlock(ByteBuffer inputBase, int inputAddress, int inputSize, ByteBuffer outputBase, long outputAddress, int outputSize, CompressionContextBb context, CompressionParameters parameters) {
         if (inputSize < MIN_BLOCK_SIZE + SIZE_OF_BLOCK_HEADER + 1) {
             //  don't even attempt compression below a certain input size
             return 0;
@@ -201,11 +209,17 @@ class ZstdFrameCompressorBb
         context.blockCompressionState.enforceMaxDistance(inputAddress + inputSize, 1 << parameters.getWindowLog());
         context.sequenceStore.reset();
 
-        int lastLiteralsSize = parameters.getStrategy()
-                .getCompressor()
-                .compressBlock(inputBase, inputAddress, inputSize, context.sequenceStore, context.blockCompressionState, context.offsets, parameters);
+        int lastLiteralsSize = compressor.compressBlock(
+                inputBase,
+                inputAddress,
+                inputSize,
+                context.sequenceStore,
+                context.blockCompressionState,
+                context.offsets,
+                parameters
+        );
 
-        long lastLiteralsAddress = inputAddress + inputSize - lastLiteralsSize;
+        int lastLiteralsAddress = inputAddress + inputSize - lastLiteralsSize;
 
         // append [lastLiteralsAddress .. lastLiteralsSize] to sequenceStore literals buffer
         context.sequenceStore.appendLiterals(inputBase, lastLiteralsAddress, lastLiteralsSize);
@@ -222,11 +236,19 @@ class ZstdFrameCompressorBb
                 outputBase,
                 output,
                 (int) (outputLimit - output),
-                context.sequenceStore.literalsBuffer,
-                context.sequenceStore.literalsLength);
+                context.sequenceStore.literalsBuffer.array(),
+                context.sequenceStore.literalsLength
+        );
         output += compressedLiteralsSize;
 
-        int compressedSequencesSize = SequenceEncoder.compressSequences(outputBase, output, (int) (outputLimit - output), context.sequenceStore, parameters.getStrategy(), context.sequenceEncodingContext);
+        int compressedSequencesSize = SequenceEncoder.compressSequences(
+                outputBase,
+                output,
+                (int) (outputLimit - output),
+                context.sequenceStore,
+                parameters.getStrategy(),
+                context.sequenceEncodingContext
+        );
 
         int compressedSize = compressedLiteralsSize + compressedSequencesSize;
         if (compressedSize == 0) {
@@ -249,14 +271,16 @@ class ZstdFrameCompressorBb
     private static int encodeLiterals(
             HuffmanCompressionContext context,
             CompressionParameters parameters,
-            Object outputBase,
+            ByteBuffer outputBase,
             long outputAddress,
             int outputSize,
             byte[] literals,
-            int literalsSize)
-    {
+            int literalsSize
+    ) {
+        // int literalsSize = literals.position();
         // TODO: move this to Strategy
         boolean bypassCompression = (parameters.getStrategy() == CompressionParameters.Strategy.FAST) && (parameters.getTargetLength() > 0);
+        // if (bypassCompression || literalsSize <= MINIMUM_LITERALS_SIZE) {
         if (bypassCompression || literalsSize <= MINIMUM_LITERALS_SIZE) {
             return rawLiterals(outputBase, outputAddress, outputSize, literals, ARRAY_BYTE_BASE_OFFSET, literalsSize);
         }
@@ -274,8 +298,7 @@ class ZstdFrameCompressorBb
         if (largestCount == literalsSize) {
             // all bytes in input are equal
             return rleLiterals(outputBase, outputAddress, outputSize, literals, ARRAY_BYTE_BASE_OFFSET, literalsSize);
-        }
-        else if (largestCount <= (literalsSize >>> 7) + 4) {
+        } else if (largestCount <= (literalsSize >>> 7) + 4) {
             // heuristic: probably not compressible enough
             return rawLiterals(outputBase, outputAddress, outputSize, literals, ARRAY_BYTE_BASE_OFFSET, literalsSize);
         }
@@ -294,26 +317,33 @@ class ZstdFrameCompressorBb
             table = previousTable;
             reuseTable = true;
             serializedTableSize = 0;
-        }
-        else {
+        } else {
             HuffmanCompressionTable newTable = context.borrowTemporaryTable();
 
             newTable.initialize(
                     counts,
                     maxSymbol,
                     HuffmanCompressionTable.optimalNumberOfBits(MAX_HUFFMAN_TABLE_LOG, literalsSize, maxSymbol),
-                    context.getCompressionTableWorkspace());
+                    context.getCompressionTableWorkspace()
+            );
 
-            serializedTableSize = newTable.write(outputBase, outputAddress + headerSize, outputSize - headerSize, context.getTableWriterWorkspace());
+            serializedTableSize = newTable.write(
+                    outputBase,
+                    outputAddress + headerSize,
+                    outputSize - headerSize,
+                    context.getTableWriterWorkspace()
+            );
 
             // Check if using previous huffman table is beneficial
-            if (canReuse && previousTable.estimateCompressedSize(counts, maxSymbol) <= serializedTableSize + newTable.estimateCompressedSize(counts, maxSymbol)) {
+            if (canReuse && previousTable.estimateCompressedSize(
+                    counts,
+                    maxSymbol
+            ) <= serializedTableSize + newTable.estimateCompressedSize(counts, maxSymbol)) {
                 table = previousTable;
                 reuseTable = true;
                 serializedTableSize = 0;
                 context.discardTemporaryTable();
-            }
-            else {
+            } else {
                 table = newTable;
                 reuseTable = false;
             }
@@ -322,10 +352,25 @@ class ZstdFrameCompressorBb
         int compressedSize;
         boolean singleStream = literalsSize < 256;
         if (singleStream) {
-            compressedSize = HuffmanCompressor.compressSingleStream(outputBase, outputAddress + headerSize + serializedTableSize, outputSize - headerSize - serializedTableSize, literals, literalsAddress, literalsSize, table);
-        }
-        else {
-            compressedSize = HuffmanCompressor.compress4streams(outputBase, outputAddress + headerSize + serializedTableSize, outputSize - headerSize - serializedTableSize, literals, literalsAddress, literalsSize, table);
+            compressedSize = HuffmanCompressor.compressSingleStream(
+                    outputBase,
+                    outputAddress + headerSize + serializedTableSize,
+                    outputSize - headerSize - serializedTableSize,
+                    literals,
+                    literalsAddress,
+                    literalsSize,
+                    table
+            );
+        } else {
+            compressedSize = HuffmanCompressor.compress4streams(
+                    outputBase,
+                    outputAddress + headerSize + serializedTableSize,
+                    outputSize - headerSize - serializedTableSize,
+                    literals,
+                    literalsAddress,
+                    literalsSize,
+                    table
+            );
         }
 
         int totalSize = serializedTableSize + compressedSize;
@@ -367,8 +412,7 @@ class ZstdFrameCompressorBb
         return headerSize + totalSize;
     }
 
-    private static int rleLiterals(Object outputBase, long outputAddress, int outputSize, Object inputBase, long inputAddress, int inputSize)
-    {
+    private static int rleLiterals(Object outputBase, long outputAddress, int outputSize, Object inputBase, long inputAddress, int inputSize) {
         int headerSize = 1 + (inputSize > 31 ? 1 : 0) + (inputSize > 4095 ? 1 : 0);
 
         switch (headerSize) {
@@ -390,15 +434,13 @@ class ZstdFrameCompressorBb
         return headerSize + 1;
     }
 
-    private static int calculateMinimumGain(int inputSize, CompressionParameters.Strategy strategy)
-    {
+    private static int calculateMinimumGain(int inputSize, CompressionParameters.Strategy strategy) {
         // TODO: move this to Strategy to avoid hardcoding a specific strategy here
         int minLog = strategy == CompressionParameters.Strategy.BTULTRA ? 7 : 6;
         return (inputSize >>> minLog) + 2;
     }
 
-    private static int rawLiterals(Object outputBase, long outputAddress, int outputSize, Object inputBase, long inputAddress, int inputSize)
-    {
+    private static int rawLiterals(Object outputBase, long outputAddress, int outputSize, Object inputBase, long inputAddress, int inputSize) {
         int headerSize = 1;
         if (inputSize >= 32) {
             headerSize++;
