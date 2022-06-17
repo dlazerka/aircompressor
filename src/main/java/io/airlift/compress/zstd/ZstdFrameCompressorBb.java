@@ -145,14 +145,14 @@ class ZstdFrameCompressorBb {
         return (output - outputBase.position());
     }
 
-    private static void compressFrame(ByteBuffer inputBase, int inputAddress, long inputLimit, ByteBuffer outputBase, long outputAddress, long outputLimit, CompressionParameters parameters) {
+    private static void compressFrame(ByteBuffer inputBase, int inputAddress, long inputLimit, ByteBuffer outputBase, int outputAddress, long outputLimit, CompressionParameters parameters) {
         int windowSize = 1 << parameters.getWindowLog(); // TODO: store window size in parameters directly?
         int blockSize = Math.min(MAX_BLOCK_SIZE, windowSize);
 
         int outputSize = (int) (outputLimit - outputAddress);
         int remaining = (int) (inputLimit - inputAddress);
 
-        long output = outputAddress;
+        int output = outputAddress;
         int input = inputAddress;
 
         CompressionContextBb context = new CompressionContextBb(parameters, inputAddress, remaining);
@@ -200,7 +200,7 @@ class ZstdFrameCompressorBb {
         // return (int) (output - outputAddress);
     }
 
-    private static int compressBlock(ByteBuffer inputBase, int inputAddress, int inputSize, ByteBuffer outputBase, long outputAddress, int outputSize, CompressionContextBb context, CompressionParameters parameters) {
+    private static int compressBlock(ByteBuffer inputBase, int inputAddress, int inputSize, ByteBuffer outputBase, int outputAddress, int outputSize, CompressionContextBb context, CompressionParameters parameters) {
         if (inputSize < MIN_BLOCK_SIZE + SIZE_OF_BLOCK_HEADER + 1) {
             //  don't even attempt compression below a certain input size
             return 0;
@@ -227,8 +227,8 @@ class ZstdFrameCompressorBb {
         // convert length/offsets into codes
         context.sequenceStore.generateCodes();
 
-        long outputLimit = outputAddress + outputSize;
-        long output = outputAddress;
+        int outputLimit = outputAddress + outputSize;
+        int output = outputAddress;
 
         int compressedLiteralsSize = encodeLiterals(
                 context.huffmanContext,
@@ -241,7 +241,7 @@ class ZstdFrameCompressorBb {
         );
         output += compressedLiteralsSize;
 
-        int compressedSequencesSize = SequenceEncoder.compressSequences(
+        int compressedSequencesSize = SequenceEncoderBb.compressSequences(
                 outputBase,
                 output,
                 (int) (outputLimit - output),
