@@ -13,6 +13,8 @@
  */
 package io.airlift.compress.zstd;
 
+import java.nio.ByteBuffer;
+
 import static io.airlift.compress.zstd.UnsafeUtil.UNSAFE;
 import static java.lang.Long.rotateLeft;
 

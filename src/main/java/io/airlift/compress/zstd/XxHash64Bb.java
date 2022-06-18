@@ -29,7 +29,7 @@ final class XxHash64Bb
 
     private XxHash64Bb() {}
 
-    public static long hash(long seed, ByteBuffer base, long address, int length)
+    public static long hash(long seed, ByteBuffer base, int address, int length)
     {
         long hash;
         if (length >= 32) {
@@ -48,20 +48,23 @@ final class XxHash64Bb
         return updateTail(hash, base, address, index, length);
     }
 
-    private static long updateTail(long hash, Object base, long address, int index, int length)
+    private static long updateTail(long hash, ByteBuffer base, int address, int index, int length)
     {
         while (index <= length - 8) {
-            hash = updateTail(hash, UNSAFE.getLong(base, address + index));
+            // hash = updateTail(hash, UNSAFE.getLong(base, address + index));
+            hash = updateTail(hash, base.getLong(address + index));
             index += 8;
         }
 
         if (index <= length - 4) {
-            hash = updateTail(hash, UNSAFE.getInt(base, address + index));
+            // hash = updateTail(hash, UNSAFE.getInt(base, address + index));
+            hash = updateTail(hash, base.getInt(address + index));
             index += 4;
         }
 
         while (index < length) {
-            hash = updateTail(hash, UNSAFE.getByte(base, address + index));
+            // hash = updateTail(hash, UNSAFE.getByte(base, address + index));
+            hash = updateTail(hash, base.get(address + index));
             index++;
         }
 
@@ -70,7 +73,7 @@ final class XxHash64Bb
         return hash;
     }
 
-    private static long updateBody(long seed, ByteBuffer base, long address, int length)
+    private static long updateBody(long seed, ByteBuffer base, int address, int length)
     {
         long v1 = seed + PRIME64_1 + PRIME64_2;
         long v2 = seed + PRIME64_2;
@@ -83,10 +86,10 @@ final class XxHash64Bb
             // v2 = mix(v2, UNSAFE.getLong(base, address + 8));
             // v3 = mix(v3, UNSAFE.getLong(base, address + 16));
             // v4 = mix(v4, UNSAFE.getLong(base, address + 24));
-            v1 = mix(v1, UNSAFE.getLong(base, address));
-            v2 = mix(v2, UNSAFE.getLong(base, address + 8));
-            v3 = mix(v3, UNSAFE.getLong(base, address + 16));
-            v4 = mix(v4, UNSAFE.getLong(base, address + 24));
+            v1 = mix(v1, base.getLong(address));
+            v2 = mix(v2, base.getLong(address + 8));
+            v3 = mix(v3, base.getLong(address + 16));
+            v4 = mix(v4, base.getLong(address + 24));
 
             address += 32;
             remaining -= 32;

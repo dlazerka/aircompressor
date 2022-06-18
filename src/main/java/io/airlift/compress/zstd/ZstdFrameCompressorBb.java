@@ -123,18 +123,18 @@ class ZstdFrameCompressorBb {
     // visible for testing
     static void writeChecksum(
             ByteBuffer outputBase,
-            long outputAddress,
-            long outputLimit,
+            int outputAddress,
+            int outputLimit,
             ByteBuffer inputBase,
-            long inputAddress,
-            long inputLimit
+            int inputAddress,
+            int inputLimit
     ) {
         // checkArgument(outputLimit - outputAddress >= SIZE_OF_INT, "Output buffer too small");
-        checkArgument(outputBase.remaining() < SIZE_OF_INT, "Output buffer too small");
+        checkArgument(outputBase.remaining() >= SIZE_OF_INT, "Output buffer too small");
 
         int inputSize = (int) (inputLimit - inputAddress);
 
-        long hash = XxHash64.hash(0, inputBase, inputAddress, inputSize);
+        long hash = XxHash64Bb.hash(0, inputBase, inputAddress, inputSize);
 
         // UNSAFE.putInt(outputBase, outputAddress, (int) hash);
         outputBase.putInt((int) hash);
@@ -143,10 +143,10 @@ class ZstdFrameCompressorBb {
     public static int compress(
             ByteBuffer inputBase,
             int inputAddress,
-            long inputLimit,
+            int inputLimit,
             ByteBuffer outputBase,
             int outputAddress,
-            long outputLimit,
+            int outputLimit,
             int compressionLevel
     ) {
         // int inputSize = (int) (inputLimit - inputAddress);
@@ -162,7 +162,7 @@ class ZstdFrameCompressorBb {
         writeMagic(outputBase);
         writeFrameHeader(outputBase, output, outputLimit, inputBase.remaining(), 1 << parameters.getWindowLog());
         compressFrame(inputBase, inputAddress, inputLimit, outputBase, outputBase.position(), outputLimit, parameters);
-        writeChecksum(outputBase, output, outputLimit, inputBase, inputAddress, inputLimit);
+        writeChecksum(outputBase, outputBase.position(), outputLimit, inputBase, inputAddress, inputLimit);
 
         return (output - outputBase.position());
     }
