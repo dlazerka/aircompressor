@@ -98,7 +98,7 @@ class SequenceStoreBb
         }
         while (copied < literalLength);
 
-        // literalsLength += literalLength;
+        literalsLength += literalLength;
         // literalsBuffer.position() is already updated
 
         if (literalLength > 65535) {

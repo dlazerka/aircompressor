@@ -53,8 +53,6 @@ class ZstdFrameCompressorBb {
     // visible for testing
     static void writeFrameHeader(
             final ByteBuffer outputBase,
-            final long outputAddress,
-            final long outputLimit,
             int inputSize,
             int windowSize
     ) {
@@ -123,8 +121,6 @@ class ZstdFrameCompressorBb {
     // visible for testing
     static void writeChecksum(
             ByteBuffer outputBase,
-            int outputAddress,
-            int outputLimit,
             ByteBuffer inputBase,
             int inputAddress,
             int inputLimit
@@ -160,9 +156,9 @@ class ZstdFrameCompressorBb {
         int output = outputBase.position();
 
         writeMagic(outputBase);
-        writeFrameHeader(outputBase, output, outputLimit, inputBase.remaining(), 1 << parameters.getWindowLog());
-        compressFrame(inputBase, inputAddress, inputLimit, outputBase, outputBase.position(), outputLimit, parameters);
-        writeChecksum(outputBase, outputBase.position(), outputLimit, inputBase, inputAddress, inputLimit);
+        writeFrameHeader(outputBase, inputBase.remaining(), 1 << parameters.getWindowLog());
+        compressFrame(inputBase, inputAddress, inputLimit, outputBase, outputBase.position(), outputBase.limit(), parameters);
+        writeChecksum(outputBase, inputBase, inputAddress, inputLimit);
 
         return (output - outputBase.position());
     }

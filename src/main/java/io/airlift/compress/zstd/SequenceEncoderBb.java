@@ -17,7 +17,6 @@ import java.nio.ByteBuffer;
 
 import static io.airlift.compress.zstd.Constants.*;
 import static io.airlift.compress.zstd.FiniteStateEntropy.optimalTableLog;
-import static io.airlift.compress.zstd.UnsafeUtil.UNSAFE;
 import static io.airlift.compress.zstd.Util.checkArgument;
 
 class SequenceEncoderBb {
@@ -97,7 +96,7 @@ class SequenceEncoderBb {
         }
 
         if (sequenceCount == 0) {
-            return (int) (output - outputAddress);
+            return output - outputAddress;
         }
 
         // flags for FSE encoding type
@@ -122,17 +121,15 @@ class SequenceEncoderBb {
 
         FseCompressionTable literalLengthTable;
         switch (literalsLengthEncodingType) {
-            case SEQUENCE_ENCODING_RLE:
+            case SEQUENCE_ENCODING_RLE -> {
                 // UNSAFE.putByte(outputBase, output, sequences.literalLengthCodes[0]);
                 outputBase.put(output, sequences.literalLengthCodes[0]);
                 output++;
                 workspace.literalLengthTable.initializeRleTable(maxSymbol);
                 literalLengthTable = workspace.literalLengthTable;
-                break;
-            case SEQUENCE_ENCODING_BASIC:
-                literalLengthTable = DEFAULT_LITERAL_LENGTHS_TABLE;
-                break;
-            case SEQUENCE_ENCODING_COMPRESSED:
+            }
+            case SEQUENCE_ENCODING_BASIC -> literalLengthTable = DEFAULT_LITERAL_LENGTHS_TABLE;
+            case SEQUENCE_ENCODING_COMPRESSED -> {
                 output += buildCompressionTable(
                         workspace.literalLengthTable,
                         outputBase,
@@ -146,9 +143,8 @@ class SequenceEncoderBb {
                         workspace.normalizedCounts
                 );
                 literalLengthTable = workspace.literalLengthTable;
-                break;
-            default:
-                throw new UnsupportedOperationException("not yet implemented");
+            }
+            default -> throw new UnsupportedOperationException("not yet implemented");
         }
 
         // offsets
@@ -169,17 +165,15 @@ class SequenceEncoderBb {
 
         FseCompressionTable offsetCodeTable;
         switch (offsetEncodingType) {
-            case SEQUENCE_ENCODING_RLE:
+            case SEQUENCE_ENCODING_RLE -> {
                 // UNSAFE.putByte(outputBase, output, sequences.offsetCodes[0]);
                 outputBase.put(output, sequences.offsetCodes[0]);
                 output++;
                 workspace.offsetCodeTable.initializeRleTable(maxSymbol);
                 offsetCodeTable = workspace.offsetCodeTable;
-                break;
-            case SEQUENCE_ENCODING_BASIC:
-                offsetCodeTable = DEFAULT_OFFSETS_TABLE;
-                break;
-            case SEQUENCE_ENCODING_COMPRESSED:
+            }
+            case SEQUENCE_ENCODING_BASIC -> offsetCodeTable = DEFAULT_OFFSETS_TABLE;
+            case SEQUENCE_ENCODING_COMPRESSED -> {
                 output += buildCompressionTable(
                         workspace.offsetCodeTable,
                         outputBase,
@@ -193,9 +187,8 @@ class SequenceEncoderBb {
                         workspace.normalizedCounts
                 );
                 offsetCodeTable = workspace.offsetCodeTable;
-                break;
-            default:
-                throw new UnsupportedOperationException("not yet implemented");
+            }
+            default -> throw new UnsupportedOperationException("not yet implemented");
         }
 
         // match lengths
@@ -213,17 +206,15 @@ class SequenceEncoderBb {
 
         FseCompressionTable matchLengthTable;
         switch (matchLengthEncodingType) {
-            case SEQUENCE_ENCODING_RLE:
+            case SEQUENCE_ENCODING_RLE -> {
                 // UNSAFE.putByte(outputBase, output, sequences.matchLengthCodes[0]);
                 outputBase.put(output, sequences.matchLengthCodes[0]);
                 output++;
                 workspace.matchLengthTable.initializeRleTable(maxSymbol);
                 matchLengthTable = workspace.matchLengthTable;
-                break;
-            case SEQUENCE_ENCODING_BASIC:
-                matchLengthTable = DEFAULT_MATCH_LENGTHS_TABLE;
-                break;
-            case SEQUENCE_ENCODING_COMPRESSED:
+            }
+            case SEQUENCE_ENCODING_BASIC -> matchLengthTable = DEFAULT_MATCH_LENGTHS_TABLE;
+            case SEQUENCE_ENCODING_COMPRESSED -> {
                 output += buildCompressionTable(
                         workspace.matchLengthTable,
                         outputBase,
@@ -237,9 +228,8 @@ class SequenceEncoderBb {
                         workspace.normalizedCounts
                 );
                 matchLengthTable = workspace.matchLengthTable;
-                break;
-            default:
-                throw new UnsupportedOperationException("not yet implemented");
+            }
+            default -> throw new UnsupportedOperationException("not yet implemented");
         }
 
         // flags
@@ -263,7 +253,7 @@ class SequenceEncoderBb {
                 sequences
         );
 
-        return (int) (output - outputAddress);
+        return output - outputAddress;
     }
 
     private static int buildCompressionTable(
@@ -301,9 +291,9 @@ class SequenceEncoderBb {
     }
 
     private static int encodeSequences(
-            Object outputBase,
-            long output,
-            long outputLimit,
+            ByteBuffer outputBase,
+            int output,
+            int outputLimit,
             FseCompressionTable matchLengthTable,
             FseCompressionTable offsetsTable,
             FseCompressionTable literalLengthTable,
@@ -313,7 +303,7 @@ class SequenceEncoderBb {
         byte[] offsetCodes = sequences.offsetCodes;
         byte[] literalLengthCodes = sequences.literalLengthCodes;
 
-        BitOutputStream blockStream = new BitOutputStream(outputBase, output, (int) (outputLimit - output));
+        BitOutputStreamBb blockStream = new BitOutputStreamBb(outputBase, output, outputLimit - output);
 
         int sequenceCount = sequences.sequenceCount;
 
