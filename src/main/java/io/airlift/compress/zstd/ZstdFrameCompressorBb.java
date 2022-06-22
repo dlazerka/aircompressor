@@ -214,7 +214,8 @@ class ZstdFrameCompressorBb {
                 compressedSize = SIZE_OF_BLOCK_HEADER + blockSize;
             } else {
                 int blockHeader = lastBlockFlag | (COMPRESSED_BLOCK << 1) | (compressedSize << 3);
-                put24BitLittleEndian(outputBase, output, blockHeader);
+                outputBase.position(output);
+                put24BitLittleEndianBb(outputBase, blockHeader);
                 compressedSize += SIZE_OF_BLOCK_HEADER;
             }
 
@@ -272,7 +273,7 @@ class ZstdFrameCompressorBb {
                 parameters,
                 outputBase,
                 output,
-                (int) (outputLimit - output),
+                outputLimit - output,
                 context.sequenceStore.literalsBuffer.array(),
                 context.sequenceStore.literalsLength
         );
@@ -281,7 +282,7 @@ class ZstdFrameCompressorBb {
         int compressedSequencesSize = SequenceEncoderBb.compressSequences(
                 outputBase,
                 output,
-                (int) (outputLimit - output),
+                outputLimit - output,
                 context.sequenceStore,
                 parameters.getStrategy(),
                 context.sequenceEncodingContext
@@ -357,7 +358,7 @@ class ZstdFrameCompressorBb {
             reuseTable = true;
             serializedTableSize = 0;
         } else {
-            HuffmanCompressionTable newTable = context.borrowTemporaryTable();
+            HuffmanCompressionTableBb newTable = context.borrowTemporaryTableBb();
 
             newTable.initialize(
                     counts,

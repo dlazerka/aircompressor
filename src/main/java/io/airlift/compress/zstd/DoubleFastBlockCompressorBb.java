@@ -227,8 +227,8 @@ class DoubleFastBlockCompressorBb {
         int input = inputAddress;
         int match = matchAddress;
 
-        // int remaining = (int) (inputLimit - inputAddress);
-        int remaining = inputBase.remaining();
+        int remaining = (int) (inputLimit - inputAddress);
+        // int remaining = inputBase.remaining();
 
         // first, compare long at a time
         int count = 0;

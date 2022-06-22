@@ -24,6 +24,11 @@ class HuffmanCompressionContext
     private HuffmanCompressionTable previousCandidate = previousTable;
     private HuffmanCompressionTable temporaryCandidate = temporaryTable;
 
+    private HuffmanCompressionTableBb previousTableBb = new HuffmanCompressionTableBb(Huffman.MAX_SYMBOL_COUNT);
+    private HuffmanCompressionTableBb temporaryTableBb = new HuffmanCompressionTableBb(Huffman.MAX_SYMBOL_COUNT);
+    private HuffmanCompressionTableBb previousCandidateBb = previousTableBb;
+    private HuffmanCompressionTableBb temporaryCandidateBb = temporaryTableBb;
+
     public HuffmanCompressionTable getPreviousTable()
     {
         return previousTable;
@@ -35,6 +40,13 @@ class HuffmanCompressionContext
         temporaryCandidate = previousTable;
 
         return temporaryTable;
+    }
+    public HuffmanCompressionTableBb borrowTemporaryTableBb()
+    {
+        previousCandidateBb = temporaryTableBb;
+        temporaryCandidateBb = previousTableBb;
+
+        return temporaryTableBb;
     }
 
     public void discardTemporaryTable()

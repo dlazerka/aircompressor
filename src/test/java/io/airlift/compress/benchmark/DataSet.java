@@ -26,7 +26,7 @@ import java.nio.file.Path;
 public class DataSet
 {
     @Param({
-            // "canterbury/alice29.txt",
+            "canterbury/alice29.txt",
             // "canterbury/asyoulik.txt",
             // "canterbury/cp.html",
             // "canterbury/fields.c",
@@ -71,7 +71,7 @@ public class DataSet
             // "calgary/trans",
             //
             // "artificial/a.txt",
-            "artificial/aaa.txt",
+            // "artificial/aaa.txt",
             // "artificial/alphabet.txt",
             // "artificial/random.txt",
             // "artificial/uniform_ascii.bin", // random ASCII with uniform probabilities per symbol

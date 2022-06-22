@@ -24,12 +24,12 @@ import static io.airlift.compress.zstd.UnsafeUtil.UNSAFE;
 import static io.airlift.compress.zstd.Util.checkArgument;
 import static io.airlift.compress.zstd.Util.minTableLog;
 
-final class HuffmanCompressionTable
+class HuffmanCompressionTable
 {
-    private final short[] values;
-    private final byte[] numberOfBits;
+    final short[] values;
+    final byte[] numberOfBits;
 
-    private int maxSymbol;
+    int maxSymbol;
     private int maxNumberOfBits;
 
     public HuffmanCompressionTable(int capacity)
@@ -392,7 +392,7 @@ final class HuffmanCompressionTable
     /**
      * All elements within weightTable must be <= Huffman.MAX_TABLE_LOG
      */
-    private static int compressWeights(Object outputBase, long outputAddress, int outputSize, byte[] weights, int weightsLength, HuffmanTableWriterWorkspace workspace)
+    static int compressWeights(Object outputBase, long outputAddress, int outputSize, byte[] weights, int weightsLength, HuffmanTableWriterWorkspace workspace)
     {
         if (weightsLength <= 1) {
             return 0; // Not compressible

@@ -67,14 +67,14 @@ public abstract class AbstractTestCompression
         // TODO
         // testCases.add(new DataSet("nothing", new byte[0]));
         // testCases.add(new DataSet("short literal", "hello world!".getBytes(UTF_8)));
-        testCases.add(new DataSet("small copy", "XXXXabcdabcdABCDABCDwxyzwzyz123".getBytes(UTF_8)));
-        testCases.add(new DataSet("long copy", "XXXXabcdefgh abcdefgh abcdefgh abcdefgh abcdefgh abcdefgh ABC".getBytes(UTF_8)));
+        // testCases.add(new DataSet("small copy", "XXXXabcdabcdABCDABCDwxyzwzyz123".getBytes(UTF_8)));
+        // testCases.add(new DataSet("long copy", "XXXXabcdefgh abcdefgh abcdefgh abcdefgh abcdefgh abcdefgh ABC".getBytes(UTF_8)));
 
         byte[] data = new byte[256];
         for (int i = 0; i < data.length; i++) {
             data[i] = (byte) i;
         }
-        testCases.add(new DataSet("long literal", data));
+        // testCases.add(new DataSet("long literal", data));
 
         testCases.addAll(dataSets);
     }
