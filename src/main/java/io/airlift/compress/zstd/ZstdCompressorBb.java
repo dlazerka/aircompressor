@@ -59,10 +59,13 @@ public class ZstdCompressorBb
 
     @Override
     public void compress(ByteBuffer inputBuffer, ByteBuffer outputBuffer) {
-        ZstdFrameCompressorBb.compress(
+        int outputPosition = outputBuffer.position();
+        int compressedSize = ZstdFrameCompressorBb.compress(
                 inputBuffer, inputBuffer.position(), inputBuffer.limit(),
                 outputBuffer, outputBuffer.position(), outputBuffer.limit(),
                 CompressionParameters.DEFAULT_COMPRESSION_LEVEL);
+        outputBuffer.position(outputPosition);
+        outputBuffer.limit(outputPosition + compressedSize);
         // return ZstdFrameCompressorBb.compress(inputBuffer, outputBuffer, CompressionParameters.DEFAULT_COMPRESSION_LEVEL);
     }
 

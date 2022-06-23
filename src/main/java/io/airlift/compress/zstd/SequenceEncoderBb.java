@@ -258,8 +258,8 @@ class SequenceEncoderBb {
 
     private static int buildCompressionTable(
             FseCompressionTable table,
-            Object outputBase,
-            long output,
+            ByteBuffer outputBase,
+            int output,
             long outputLimit,
             int sequenceCount,
             int maxTableLog,
@@ -277,10 +277,10 @@ class SequenceEncoderBb {
             sequenceCount--;
         }
 
-        FiniteStateEntropy.normalizeCounts(normalizedCounts, tableLog, counts, sequenceCount, maxSymbol);
+        FiniteStateEntropyBb.normalizeCounts(normalizedCounts, tableLog, counts, sequenceCount, maxSymbol);
         table.initialize(normalizedCounts, maxSymbol, tableLog);
 
-        return FiniteStateEntropy.writeNormalizedCounts(
+        return FiniteStateEntropyBb.writeNormalizedCounts(
                 outputBase,
                 output,
                 (int) (outputLimit - output),

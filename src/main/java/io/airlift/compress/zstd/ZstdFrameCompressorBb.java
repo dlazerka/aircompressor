@@ -18,9 +18,7 @@ import java.nio.ByteBuffer;
 import static io.airlift.compress.zstd.Constants.*;
 import static io.airlift.compress.zstd.Huffman.MAX_SYMBOL;
 import static io.airlift.compress.zstd.Huffman.MAX_SYMBOL_COUNT;
-import static io.airlift.compress.zstd.UnsafeUtil.UNSAFE;
 import static io.airlift.compress.zstd.Util.*;
-import static sun.misc.Unsafe.ARRAY_BYTE_BASE_OFFSET;
 
 class ZstdFrameCompressorBb {
     static final int MAX_FRAME_HEADER_SIZE = 14;
@@ -153,17 +151,17 @@ class ZstdFrameCompressorBb {
             throw new UnsupportedOperationException("Only DFAST strategy is supported");
         }
 
-        int output = outputBase.position();
+        int outputStart = outputBase.position();
 
         writeMagic(outputBase);
         writeFrameHeader(outputBase, inputBase.remaining(), 1 << parameters.getWindowLog());
-        compressFrame(inputBase, inputAddress, inputLimit, outputBase, outputBase.position(), outputBase.limit(), parameters);
+        int compressedSize = compressFrame(inputBase, inputAddress, inputLimit, outputBase, outputBase.position(), outputBase.limit(), parameters);
         writeChecksum(outputBase, inputBase, inputAddress, inputLimit);
 
-        return (output - outputBase.position());
+        return outputBase.position() - outputStart;
     }
 
-    private static void compressFrame(
+    private static int compressFrame(
             ByteBuffer inputBase,
             int inputAddress,
             long inputLimit,
@@ -226,7 +224,7 @@ class ZstdFrameCompressorBb {
         }
         while (remaining > 0);
         outputBase.position(output);
-        // return (int) (output - outputAddress);
+        return output - outputAddress;
     }
 
     private static int compressBlock(
@@ -307,7 +305,7 @@ class ZstdFrameCompressorBb {
     }
 
     private static int encodeLiterals(
-            HuffmanCompressionContext context,
+            HuffmanCompressionContextBb context,
             CompressionParameters parameters,
             ByteBuffer outputBase,
             int outputAddress,
@@ -333,18 +331,19 @@ class ZstdFrameCompressorBb {
         int maxSymbol = Histogram.findMaxSymbol(counts, MAX_SYMBOL);
         int largestCount = Histogram.findLargestCount(counts, maxSymbol);
 
-        long literalsAddress = ARRAY_BYTE_BASE_OFFSET;
+        // long literalsAddress = ARRAY_BYTE_BASE_OFFSET;
+        int literalsAddress = 0;
         if (largestCount == literalsSize) {
             // all bytes in input are equal
-            return rleLiterals(outputBase, outputAddress, outputSize, literals, ARRAY_BYTE_BASE_OFFSET, literalsSize);
+            return rleLiterals(outputBase, outputAddress, outputSize, literals, literalsSize);
         } else if (largestCount <= (literalsSize >>> 7) + 4) {
             // heuristic: probably not compressible enough
             outputBase.position(outputAddress);
             return rawLiterals(outputBase, outputSize, literals, literalsSize);
         }
 
-        HuffmanCompressionTable previousTable = context.getPreviousTable();
-        HuffmanCompressionTable table;
+        HuffmanCompressionTableBb previousTable = context.getPreviousTable();
+        HuffmanCompressionTableBb table;
         int serializedTableSize;
         boolean reuseTable;
 
@@ -358,12 +357,12 @@ class ZstdFrameCompressorBb {
             reuseTable = true;
             serializedTableSize = 0;
         } else {
-            HuffmanCompressionTableBb newTable = context.borrowTemporaryTableBb();
+            HuffmanCompressionTableBb newTable = context.borrowTemporaryTable();
 
             newTable.initialize(
                     counts,
                     maxSymbol,
-                    HuffmanCompressionTable.optimalNumberOfBits(MAX_HUFFMAN_TABLE_LOG, literalsSize, maxSymbol),
+                    HuffmanCompressionTableBb.optimalNumberOfBits(MAX_HUFFMAN_TABLE_LOG, literalsSize, maxSymbol),
                     context.getCompressionTableWorkspace()
             );
 
@@ -392,7 +391,7 @@ class ZstdFrameCompressorBb {
         int compressedSize;
         boolean singleStream = literalsSize < 256;
         if (singleStream) {
-            compressedSize = HuffmanCompressor.compressSingleStream(
+            compressedSize = HuffmanCompressorBb.compressSingleStream(
                     outputBase,
                     outputAddress + headerSize + serializedTableSize,
                     outputSize - headerSize - serializedTableSize,
@@ -402,7 +401,7 @@ class ZstdFrameCompressorBb {
                     table
             );
         } else {
-            compressedSize = HuffmanCompressor.compress4streams(
+            compressedSize = HuffmanCompressorBb.compress4streams(
                     outputBase,
                     outputAddress + headerSize + serializedTableSize,
                     outputSize - headerSize - serializedTableSize,
@@ -430,54 +429,56 @@ class ZstdFrameCompressorBb {
 
         // Build header
         switch (headerSize) {
-            case 3: { // 2 - 2 - 10 - 10
+            case 3 -> { // 2 - 2 - 10 - 10
                 int header = encodingType | ((singleStream ? 0 : 1) << 2) | (literalsSize << 4) | (totalSize << 14);
-                put24BitLittleEndian(outputBase, outputAddress, header);
-                break;
+                // put24BitLittleEndian(outputBase, outputAddress, header);
+                outputBase.position(outputAddress);
+                put24BitLittleEndianBb(outputBase, header);
             }
-            case 4: { // 2 - 2 - 14 - 14
+            case 4 -> { // 2 - 2 - 14 - 14
                 int header = encodingType | (2 << 2) | (literalsSize << 4) | (totalSize << 18);
-                UNSAFE.putInt(outputBase, outputAddress, header);
-                break;
+                // UNSAFE.putInt(outputBase, outputAddress, header);
+                outputBase.putInt(outputAddress, header);
             }
-            case 5: { // 2 - 2 - 18 - 18
+            case 5 -> { // 2 - 2 - 18 - 18
                 int header = encodingType | (3 << 2) | (literalsSize << 4) | (totalSize << 22);
-                UNSAFE.putInt(outputBase, outputAddress, header);
-                UNSAFE.putByte(outputBase, outputAddress + SIZE_OF_INT, (byte) (totalSize >>> 10));
-                break;
+                // UNSAFE.putInt(outputBase, outputAddress, header);
+                // UNSAFE.putByte(outputBase, outputAddress + SIZE_OF_INT, (byte) (totalSize >>> 10));
+                outputBase.putInt(outputAddress, header);
+                outputBase.put(outputAddress + SIZE_OF_INT, (byte) (totalSize >>> 10));
             }
-            default:  // not possible : headerSize is {3,4,5}
-                throw new IllegalStateException();
+            default ->  // not possible : headerSize is {3,4,5}
+                    throw new IllegalStateException();
         }
 
         return headerSize + totalSize;
     }
 
     private static int rleLiterals(
-            Object outputBase,
-            long outputAddress,
+            ByteBuffer outputBase,
+            int outputAddress,
             int outputSize,
-            Object inputBase,
-            long inputAddress,
+            byte[] inputBase,
             int inputSize
     ) {
         int headerSize = 1 + (inputSize > 31 ? 1 : 0) + (inputSize > 4095 ? 1 : 0);
 
         switch (headerSize) {
-            case 1: // 2 - 1 - 5
-                UNSAFE.putByte(outputBase, outputAddress, (byte) (RLE_LITERALS_BLOCK | (inputSize << 3)));
-                break;
-            case 2: // 2 - 2 - 12
-                UNSAFE.putShort(outputBase, outputAddress, (short) (RLE_LITERALS_BLOCK | (1 << 2) | (inputSize << 4)));
-                break;
-            case 3: // 2 - 2 - 20
-                UNSAFE.putInt(outputBase, outputAddress, RLE_LITERALS_BLOCK | 3 << 2 | inputSize << 4);
-                break;
-            default:   // impossible. headerSize is {1,2,3}
-                throw new IllegalStateException();
+            case 1 -> // 2 - 1 - 5
+                // UNSAFE.putByte(outputBase, outputAddress, (byte) (RLE_LITERALS_BLOCK | (inputSize << 3)));
+                    outputBase.put(outputAddress, (byte) (RLE_LITERALS_BLOCK | (inputSize << 3)));
+            case 2 -> // 2 - 2 - 12
+                // UNSAFE.putShort(outputBase, outputAddress, (short) (RLE_LITERALS_BLOCK | (1 << 2) | (inputSize << 4)));
+                    outputBase.putShort(outputAddress, (short) (RLE_LITERALS_BLOCK | (1 << 2) | (inputSize << 4)));
+            case 3 -> // 2 - 2 - 20
+                // UNSAFE.putInt(outputBase, outputAddress, RLE_LITERALS_BLOCK | 3 << 2 | inputSize << 4);
+                    outputBase.putInt(outputAddress, RLE_LITERALS_BLOCK | 3 << 2 | inputSize << 4);
+            default ->   // impossible. headerSize is {1,2,3}
+                    throw new IllegalStateException();
         }
 
-        UNSAFE.putByte(outputBase, outputAddress + headerSize, UNSAFE.getByte(inputBase, inputAddress));
+        // UNSAFE.putByte(outputBase, outputAddress + headerSize, UNSAFE.getByte(inputBase, inputAddress));
+        outputBase.put(outputAddress + headerSize, inputBase[0]);
 
         return headerSize + 1;
     }

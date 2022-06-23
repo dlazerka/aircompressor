@@ -23,7 +23,7 @@ class CompressionContextBb
 
     public final SequenceEncodingContext sequenceEncodingContext = new SequenceEncodingContext();
 
-    public final HuffmanCompressionContext huffmanContext = new HuffmanCompressionContext();
+    public final HuffmanCompressionContextBb huffmanContext = new HuffmanCompressionContextBb();
 
     public CompressionContextBb(CompressionParameters parameters, long baseAddress, int inputSize)
     {

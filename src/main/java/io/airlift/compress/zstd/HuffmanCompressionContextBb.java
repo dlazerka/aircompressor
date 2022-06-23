@@ -13,23 +13,23 @@
  */
 package io.airlift.compress.zstd;
 
-class HuffmanCompressionContext
+class HuffmanCompressionContextBb
 {
     private final HuffmanTableWriterWorkspace tableWriterWorkspace = new HuffmanTableWriterWorkspace();
     private final HuffmanCompressionTableWorkspace compressionTableWorkspace = new HuffmanCompressionTableWorkspace();
 
-    private HuffmanCompressionTable previousTable = new HuffmanCompressionTable(Huffman.MAX_SYMBOL_COUNT);
-    private HuffmanCompressionTable temporaryTable = new HuffmanCompressionTable(Huffman.MAX_SYMBOL_COUNT);
+    private HuffmanCompressionTableBb previousTable = new HuffmanCompressionTableBb(Huffman.MAX_SYMBOL_COUNT);
+    private HuffmanCompressionTableBb temporaryTable = new HuffmanCompressionTableBb(Huffman.MAX_SYMBOL_COUNT);
 
-    private HuffmanCompressionTable previousCandidate = previousTable;
-    private HuffmanCompressionTable temporaryCandidate = temporaryTable;
+    private HuffmanCompressionTableBb previousCandidate = previousTable;
+    private HuffmanCompressionTableBb temporaryCandidate = temporaryTable;
 
-    public HuffmanCompressionTable getPreviousTable()
+    public HuffmanCompressionTableBb getPreviousTable()
     {
         return previousTable;
     }
 
-    public HuffmanCompressionTable borrowTemporaryTable()
+    public HuffmanCompressionTableBb borrowTemporaryTable()
     {
         previousCandidate = temporaryTable;
         temporaryCandidate = previousTable;

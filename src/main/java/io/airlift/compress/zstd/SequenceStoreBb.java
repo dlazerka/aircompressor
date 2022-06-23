@@ -122,7 +122,7 @@ class SequenceStoreBb
     public void reset()
     {
         literalsBuffer.rewind();
-        // literalsLength = 0;
+        literalsLength = 0;
         sequenceCount = 0;
         longLengthField = null;
     }
