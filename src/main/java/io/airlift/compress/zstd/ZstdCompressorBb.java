@@ -64,8 +64,11 @@ public class ZstdCompressorBb
                 inputBuffer, inputBuffer.position(), inputBuffer.limit(),
                 outputBuffer, outputBuffer.position(), outputBuffer.limit(),
                 CompressionParameters.DEFAULT_COMPRESSION_LEVEL);
-        outputBuffer.position(outputPosition);
-        outputBuffer.limit(outputPosition + compressedSize);
+        // outputBuffer.position(outputPosition);
+        // outputBuffer.limit(outputPosition + compressedSize);
+
+        outputBuffer.limit(compressedSize);
+
         // return ZstdFrameCompressorBb.compress(inputBuffer, outputBuffer, CompressionParameters.DEFAULT_COMPRESSION_LEVEL);
     }
 

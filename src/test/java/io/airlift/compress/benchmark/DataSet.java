@@ -26,7 +26,7 @@ import java.nio.file.Path;
 public class DataSet
 {
     @Param({
-            "canterbury/alice29.txt",
+            // "canterbury/alice29.txt",
             // "canterbury/asyoulik.txt",
             // "canterbury/cp.html",
             // "canterbury/fields.c",
@@ -39,7 +39,7 @@ public class DataSet
             // "canterbury/xargs.1",
             //
             // "silesia/dickens",
-            // "silesia/mozilla",
+            "silesia/mozilla",
             // "silesia/mr",
             // "silesia/nci",
             // "silesia/ooffice",

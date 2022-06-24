@@ -23,10 +23,17 @@ import org.testng.annotations.Test;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 
 import static io.airlift.compress.Util.readResourceAsByteBuffer;
 import static java.nio.ByteOrder.LITTLE_ENDIAN;
+import static java.nio.file.StandardOpenOption.CREATE;
+import static java.nio.file.StandardOpenOption.WRITE;
 import static org.testng.Assert.assertEquals;
 
 public class TestZstdBb
@@ -78,11 +85,20 @@ public class TestZstdBb
 */
 
         compressor.compress(originalUncompressed, compressed);
+        compressed.rewind();
+
+        Path path = FileSystems.getDefault().getPath("bb.bin");
+        try (FileChannel fc = FileChannel.open(path, WRITE, CREATE)) {
+            ByteBuffer bb = ByteBuffer.wrap(compressed.array(), 0, compressed.capacity());
+            fc.write(bb);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
 
         verifyCompressedData(
                 originalUncompressed.array(),
                 compressed.array(),
-                compressed.remaining()
+                compressed.capacity()
         );
     }
 

@@ -26,6 +26,8 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -35,6 +37,8 @@ import java.util.concurrent.ThreadLocalRandom;
 import static com.google.common.base.Preconditions.checkPositionIndexes;
 import static java.lang.System.arraycopy;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.nio.file.StandardOpenOption.CREATE;
+import static java.nio.file.StandardOpenOption.WRITE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowable;
@@ -335,6 +339,11 @@ public abstract class AbstractTestCompression
                 0,
                 compressed.length);
 
+        Path path = FileSystems.getDefault().getPath("o.bin");
+        try (FileChannel fc = FileChannel.open(path, WRITE, CREATE)) {
+            ByteBuffer bb = ByteBuffer.wrap(compressed, 0, compressed.length);
+            fc.write(bb);
+        }
         verifyCompressedData(originalUncompressed, compressed, compressedLength);
     }
 
