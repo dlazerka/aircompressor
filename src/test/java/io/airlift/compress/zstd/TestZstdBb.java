@@ -95,6 +95,19 @@ public class TestZstdBb
             throw new RuntimeException(e);
         }
 
+        int decompressedSize = (int) ZstdDecompressor.getDecompressedSize(compressed.array(), 0, compressed.remaining());
+        byte[] bytes = new byte[decompressedSize];
+        int decompressedSize2 = new ZstdDecompressor().decompress(
+                compressed.array(),
+                0,
+                compressed.remaining(),
+                bytes,
+                0,
+                decompressedSize
+        );
+        assertEquals(decompressedSize2, decompressedSize);
+        assertByteArraysEqual(compressed.array(), 0, compressed.remaining(), bytes, 0, decompressedSize2);
+
         verifyCompressedData(
                 originalUncompressed.array(),
                 compressed.array(),
