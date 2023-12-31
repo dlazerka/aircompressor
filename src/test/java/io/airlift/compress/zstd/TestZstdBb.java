@@ -87,13 +87,13 @@ public class TestZstdBb
         compressor.compress(originalUncompressed, compressed);
         compressed.rewind();
 
-        Path path = FileSystems.getDefault().getPath("bb.bin");
-        try (FileChannel fc = FileChannel.open(path, WRITE, CREATE)) {
-            ByteBuffer bb = ByteBuffer.wrap(compressed.array(), 0, compressed.capacity());
-            fc.write(bb);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        // Path path = FileSystems.getDefault().getPath("bb.bin");
+        // try (FileChannel fc = FileChannel.open(path, WRITE, CREATE)) {
+        //     ByteBuffer bb = ByteBuffer.wrap(compressed.array(), 0, compressed.capacity());
+        //     fc.write(bb);
+        // } catch (IOException e) {
+        //     throw new RuntimeException(e);
+        // }
 
         int decompressedSize = (int) ZstdDecompressor.getDecompressedSize(compressed.array(), 0, compressed.remaining());
         byte[] bytes = new byte[decompressedSize];

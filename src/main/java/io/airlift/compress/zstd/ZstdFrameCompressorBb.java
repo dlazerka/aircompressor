@@ -131,7 +131,8 @@ class ZstdFrameCompressorBb {
         long hash = XxHash64Bb.hash(0, inputBase, inputAddress, inputSize);
 
         // UNSAFE.putInt(outputBase, outputAddress, (int) hash);
-        outputBase.putInt((int) hash);
+        int hash1 = (int) hash;
+        outputBase.putInt(hash1);
     }
 
     public static int compress(

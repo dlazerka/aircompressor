@@ -15,6 +15,7 @@ package io.airlift.compress;
 
 import com.google.common.primitives.Bytes;
 import io.airlift.compress.benchmark.DataSet;
+import io.airlift.compress.zstd.ZstdDecompressor;
 import org.testng.SkipException;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Guice;
@@ -339,11 +340,24 @@ public abstract class AbstractTestCompression
                 0,
                 compressed.length);
 
-        Path path = FileSystems.getDefault().getPath("o.bin");
-        try (FileChannel fc = FileChannel.open(path, WRITE, CREATE)) {
-            ByteBuffer bb = ByteBuffer.wrap(compressed, 0, compressed.length);
-            fc.write(bb);
-        }
+        // Path path = FileSystems.getDefault().getPath("o.bin");
+        // try (FileChannel fc = FileChannel.open(path, WRITE, CREATE)) {
+        //     ByteBuffer bb = ByteBuffer.wrap(compressed, 0, compressed.length);
+        //     fc.write(bb);
+        // }
+
+        int decompressedSize = (int) ZstdDecompressor.getDecompressedSize(compressed, 0, compressedLength);
+        byte[] bytes = new byte[decompressedSize];
+        int decompressedSize2 = new ZstdDecompressor().decompress(
+                compressed,
+                0,
+                compressedLength,
+                bytes,
+                0,
+                decompressedSize
+        );
+        assertEquals(decompressedSize2, decompressedSize);
+
         verifyCompressedData(originalUncompressed, compressed, compressedLength);
     }
 
