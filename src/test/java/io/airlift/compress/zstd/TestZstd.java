@@ -13,6 +13,7 @@
  */
 package io.airlift.compress.zstd;
 
+import com.google.common.io.Resources;
 import io.airlift.compress.AbstractTestCompression;
 import io.airlift.compress.Compressor;
 import io.airlift.compress.Decompressor;
@@ -192,8 +193,8 @@ public class TestZstd
             throws IOException
     {
         Compressor compressor = getCompressor();
-        byte[] compressed = Resources.toByteArray(getClass().getClassLoader().getResource("data/zstd/bad-second-frame.zst"));
-        byte[] uncompressed = Resources.toByteArray(getClass().getClassLoader().getResource("data/zstd/multiple-frames"));
+        byte[] compressed = readResourceAsBytes("data/zstd/bad-second-frame.zst");
+        byte[] uncompressed = readResourceAsBytes("data/zstd/multiple-frames");
         byte[] output = new byte[uncompressed.length];
         assertThatThrownBy(() -> getDecompressor().decompress(compressed, 0, compressed.length, output, 0, output.length))
                 .isInstanceOf(MalformedInputException.class)
