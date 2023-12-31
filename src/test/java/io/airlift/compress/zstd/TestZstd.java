@@ -23,30 +23,37 @@ import io.airlift.compress.thirdparty.ZstdJniDecompressor;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Arrays;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static io.airlift.compress.Util.readResourceAsBytes;
 import static org.testng.Assert.assertEquals;
 
 public class TestZstd
-        extends AbstractTestCompression {
+        extends AbstractTestCompression
+{
     @Override
-    protected Compressor getCompressor() {
+    protected Compressor getCompressor()
+    {
         return new ZstdCompressor();
     }
 
     @Override
-    protected Decompressor getDecompressor() {
+    protected Decompressor getDecompressor()
+    {
         return new ZstdDecompressor();
     }
 
     @Override
-    protected Compressor getVerifyCompressor() {
+    protected Compressor getVerifyCompressor()
+    {
         return new ZstdJniCompressor(3);
     }
 
     @Override
-    protected Decompressor getVerifyDecompressor() {
+    protected Decompressor getVerifyDecompressor()
+    {
         return new ZstdJniDecompressor();
     }
 
@@ -54,7 +61,8 @@ public class TestZstd
     // compressor doesn't include checksums, so it's not a comprehensive test. The dataset for this test has a checksum.
     @Test
     public void testDecompressWithOutputPaddingAndChecksum()
-            throws IOException {
+            throws IOException
+    {
         int padding = 1021;
 
         byte[] compressed = readResourceAsBytes("data/zstd/with-checksum.zst");
@@ -78,18 +86,21 @@ public class TestZstd
         assertByteArraysEqual(uncompressed, 0, uncompressed.length, output, 0, output.length);
     }
 
-    @Test(expectedExceptions = MalformedInputException.class, expectedExceptionsMessageRegExp = "Input is corrupted: offset=894")
+    @Test
     public void testInvalidSequenceOffset()
             throws IOException {
         byte[] compressed = readResourceAsBytes("data/zstd/offset-before-start.zst");
         byte[] output = new byte[compressed.length * 10];
 
-        getDecompressor().decompress(compressed, 0, compressed.length, output, 0, output.length);
+        assertThatThrownBy(() -> getDecompressor().decompress(compressed, 0, compressed.length, output, 0, output.length))
+                .isInstanceOf(MalformedInputException.class)
+                .hasMessageStartingWith("Input is corrupted: offset=894");
     }
 
     @Test
     public void testSmallLiteralsAfterIncompressibleLiterals()
-            throws IOException {
+            throws IOException
+    {
         // Ensure the compressor doesn't try to reuse a huffman table that was created speculatively for a previous block
         // which ended up emitting raw literals due to insufficient gain
         Compressor compressor = getCompressor();
@@ -108,7 +119,8 @@ public class TestZstd
 
     @Test
     public void testLargeRle()
-            throws IOException {
+            throws IOException
+    {
         // Dataset that produces an RLE block with 3-byte header
 
         Compressor compressor = getCompressor();
@@ -127,7 +139,8 @@ public class TestZstd
 
     @Test
     public void testIncompressibleData()
-            throws IOException {
+            throws IOException
+    {
         // Incompressible data that would require more than maxCompressedLength(...) to store
 
         Compressor compressor = getCompressor();
@@ -145,7 +158,8 @@ public class TestZstd
     }
 
     @Test
-    public void testMaxCompressedSize() {
+    public void testMaxCompressedSize()
+    {
         assertEquals(new ZstdCompressor().maxCompressedLength(0), 64);
         assertEquals(new ZstdCompressor().maxCompressedLength(64 * 1024), 65_824);
         assertEquals(new ZstdCompressor().maxCompressedLength(128 * 1024), 131_584);
@@ -154,10 +168,12 @@ public class TestZstd
 
     // test over data sets, should the result depend on input size or its compressibility
     @Test(dataProvider = "data")
-    public void testGetDecompressedSize(DataSet dataSet) {
+    public void testGetDecompressedSize(DataSet dataSet)
+    {
         Compressor compressor = getCompressor();
         byte[] originalUncompressed = dataSet.getUncompressed();
         byte[] compressed = new byte[compressor.maxCompressedLength(originalUncompressed.length)];
+
         int compressedLength = compressor.compress(originalUncompressed, 0, originalUncompressed.length, compressed, 0, compressed.length);
 
         assertByteArraysEqual(compressed, 0, compressed.length, compressed, 0, compressed.length);
@@ -169,5 +185,28 @@ public class TestZstd
         Arrays.fill(compressedWithPadding, (byte) 42);
         System.arraycopy(compressed, 0, compressedWithPadding, padding, compressedLength);
         assertEquals(ZstdDecompressor.getDecompressedSize(compressedWithPadding, padding, compressedLength), originalUncompressed.length);
+    }
+
+    @Test
+    public void testVerifyMagicInAllFrames()
+            throws IOException
+    {
+        Compressor compressor = getCompressor();
+        byte[] compressed = Resources.toByteArray(getClass().getClassLoader().getResource("data/zstd/bad-second-frame.zst"));
+        byte[] uncompressed = Resources.toByteArray(getClass().getClassLoader().getResource("data/zstd/multiple-frames"));
+        byte[] output = new byte[uncompressed.length];
+        assertThatThrownBy(() -> getDecompressor().decompress(compressed, 0, compressed.length, output, 0, output.length))
+                .isInstanceOf(MalformedInputException.class)
+                .hasMessageStartingWith("Invalid magic prefix");
+    }
+
+    @Test
+    public void testDecompressIsMissingData()
+    {
+        byte[] input = new byte[]{40, -75, 47, -3, 32, 0, 1, 0};
+        byte[] output = new byte[1024];
+        assertThatThrownBy(() -> getDecompressor().decompress(input, 0, input.length, output, 0, output.length))
+                .matches(e -> e instanceof MalformedInputException || e instanceof UncheckedIOException)
+                .hasMessageContaining("Not enough input bytes");
     }
 }

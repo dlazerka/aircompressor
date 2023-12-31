@@ -16,7 +16,6 @@ package io.airlift.compress.zstd;
 import static io.airlift.compress.zstd.Constants.COMPRESSED_BLOCK;
 import static io.airlift.compress.zstd.Constants.COMPRESSED_LITERALS_BLOCK;
 import static io.airlift.compress.zstd.Constants.MAGIC_NUMBER;
-import static io.airlift.compress.zstd.Constants.MAX_BLOCK_SIZE;
 import static io.airlift.compress.zstd.Constants.MIN_BLOCK_SIZE;
 import static io.airlift.compress.zstd.Constants.MIN_WINDOW_LOG;
 import static io.airlift.compress.zstd.Constants.RAW_BLOCK;
@@ -65,10 +64,13 @@ class ZstdFrameCompressor
 
         long output = outputAddress;
 
-        int contentSizeDescriptor = (inputSize >= 256 ? 1 : 0) + (inputSize >= 65536 + 256 ? 1 : 0);
+        int contentSizeDescriptor = 0;
+        if (inputSize != -1) {
+            contentSizeDescriptor = (inputSize >= 256 ? 1 : 0) + (inputSize >= 65536 + 256 ? 1 : 0);
+        }
         int frameHeaderDescriptor = (contentSizeDescriptor << 6) | CHECKSUM_FLAG; // dictionary ID missing
 
-        boolean singleSegment = windowSize >= inputSize;
+        boolean singleSegment = inputSize != -1 && windowSize >= inputSize;
         if (singleSegment) {
             frameHeaderDescriptor |= SINGLE_SEGMENT_FLAG;
         }
@@ -142,7 +144,7 @@ class ZstdFrameCompressor
         long output = outputAddress;
 
         output += writeMagic(outputBase, output, outputLimit);
-        output += writeFrameHeader(outputBase, output, outputLimit, inputSize, 1 << parameters.getWindowLog());
+        output += writeFrameHeader(outputBase, output, outputLimit, inputSize, parameters.getWindowSize());
         output += compressFrame(inputBase, inputAddress, inputLimit, outputBase, output, outputLimit, parameters);
         output += writeChecksum(outputBase, output, outputLimit, inputBase, inputAddress, inputLimit);
 
@@ -151,8 +153,7 @@ class ZstdFrameCompressor
 
     private static int compressFrame(Object inputBase, long inputAddress, long inputLimit, Object outputBase, long outputAddress, long outputLimit, CompressionParameters parameters)
     {
-        int windowSize = 1 << parameters.getWindowLog(); // TODO: store window size in parameters directly?
-        int blockSize = Math.min(MAX_BLOCK_SIZE, windowSize);
+        int blockSize = parameters.getBlockSize();
 
         int outputSize = (int) (outputLimit - outputAddress);
         int remaining = (int) (inputLimit - inputAddress);
@@ -161,31 +162,13 @@ class ZstdFrameCompressor
         long input = inputAddress;
 
         CompressionContext context = new CompressionContext(parameters, inputAddress, remaining);
-
         do {
             checkArgument(outputSize >= SIZE_OF_BLOCK_HEADER + MIN_BLOCK_SIZE, "Output buffer too small");
 
-            int lastBlockFlag = blockSize >= remaining ? 1 : 0;
+            boolean lastBlock = blockSize >= remaining;
             blockSize = Math.min(blockSize, remaining);
 
-            int compressedSize = 0;
-            if (remaining > 0) {
-                compressedSize = compressBlock(inputBase, input, blockSize, outputBase, output + SIZE_OF_BLOCK_HEADER, outputSize - SIZE_OF_BLOCK_HEADER, context, parameters);
-            }
-
-            if (compressedSize == 0) { // block is not compressible
-                checkArgument(blockSize + SIZE_OF_BLOCK_HEADER <= outputSize, "Output size too small");
-
-                int blockHeader = lastBlockFlag | (RAW_BLOCK << 1) | (blockSize << 3);
-                put24BitLittleEndian(outputBase, output, blockHeader);
-                UNSAFE.copyMemory(inputBase, input, outputBase, output + SIZE_OF_BLOCK_HEADER, blockSize);
-                compressedSize = SIZE_OF_BLOCK_HEADER + blockSize;
-            }
-            else {
-                int blockHeader = lastBlockFlag | (COMPRESSED_BLOCK << 1) | (compressedSize << 3);
-                put24BitLittleEndian(outputBase, output, blockHeader);
-                compressedSize += SIZE_OF_BLOCK_HEADER;
-            }
+            int compressedSize = writeCompressedBlock(inputBase, input, blockSize, outputBase, output, outputSize, context, lastBlock);
 
             input += blockSize;
             remaining -= blockSize;
@@ -197,14 +180,40 @@ class ZstdFrameCompressor
         return (int) (output - outputAddress);
     }
 
-    private static int compressBlock(Object inputBase, long inputAddress, int inputSize, Object outputBase, long outputAddress, int outputSize, CompressionContext context, CompressionParameters parameters)
+    static int writeCompressedBlock(Object inputBase, long input, int blockSize, Object outputBase, long output, int outputSize, CompressionContext context, boolean lastBlock)
+    {
+        checkArgument(lastBlock || blockSize == context.parameters.getBlockSize(), "Only last block can be smaller than block size");
+
+        int compressedSize = 0;
+        if (blockSize > 0) {
+            compressedSize = compressBlock(inputBase, input, blockSize, outputBase, output + SIZE_OF_BLOCK_HEADER, outputSize - SIZE_OF_BLOCK_HEADER, context);
+        }
+
+        if (compressedSize == 0) { // block is not compressible
+            checkArgument(blockSize + SIZE_OF_BLOCK_HEADER <= outputSize, "Output size too small");
+
+            int blockHeader = (lastBlock ? 1 : 0) | (RAW_BLOCK << 1) | (blockSize << 3);
+            put24BitLittleEndian(outputBase, output, blockHeader);
+            UNSAFE.copyMemory(inputBase, input, outputBase, output + SIZE_OF_BLOCK_HEADER, blockSize);
+            compressedSize = SIZE_OF_BLOCK_HEADER + blockSize;
+        }
+        else {
+            int blockHeader = (lastBlock ? 1 : 0) | (COMPRESSED_BLOCK << 1) | (compressedSize << 3);
+            put24BitLittleEndian(outputBase, output, blockHeader);
+            compressedSize += SIZE_OF_BLOCK_HEADER;
+        }
+        return compressedSize;
+    }
+
+    private static int compressBlock(Object inputBase, long inputAddress, int inputSize, Object outputBase, long outputAddress, int outputSize, CompressionContext context)
     {
         if (inputSize < MIN_BLOCK_SIZE + SIZE_OF_BLOCK_HEADER + 1) {
             //  don't even attempt compression below a certain input size
             return 0;
         }
 
-        context.blockCompressionState.enforceMaxDistance(inputAddress + inputSize, 1 << parameters.getWindowLog());
+        CompressionParameters parameters = context.parameters;
+        context.blockCompressionState.enforceMaxDistance(inputAddress + inputSize, parameters.getWindowSize());
         context.sequenceStore.reset();
 
         int lastLiteralsSize = parameters.getStrategy()

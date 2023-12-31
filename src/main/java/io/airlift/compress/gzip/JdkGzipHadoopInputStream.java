@@ -13,23 +13,26 @@
  */
 package io.airlift.compress.gzip;
 
-import org.apache.hadoop.io.compress.CompressionInputStream;
+import io.airlift.compress.hadoop.HadoopInputStream;
 
+import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.zip.GZIPInputStream;
 
-class HadoopJdkGzipInputStream
-        extends CompressionInputStream
+import static java.lang.Math.max;
+import static java.util.Objects.requireNonNull;
+
+class JdkGzipHadoopInputStream
+        extends HadoopInputStream
 {
     private final byte[] oneByte = new byte[1];
     private final GZIPInputStream input;
 
-    public HadoopJdkGzipInputStream(InputStream input, int bufferSize)
+    public JdkGzipHadoopInputStream(InputStream input, int bufferSize)
             throws IOException
     {
-        super(input);
-        this.input = new GZIPInputStream(input, bufferSize);
+        this.input = new GZIPInputStream(new GzipBufferedInputStream(input, bufferSize), bufferSize);
     }
 
     @Override
@@ -52,20 +55,32 @@ class HadoopJdkGzipInputStream
 
     @Override
     public void resetState()
-            throws IOException
     {
         throw new UnsupportedOperationException("resetState not supported for gzip");
     }
 
     @Override
-    public void close() throws IOException
+    public void close()
+            throws IOException
     {
-        try {
-            super.close();
+        input.close();
+    }
+
+    // workaround for https://bugs.openjdk.org/browse/JDK-8081450
+    private static class GzipBufferedInputStream
+            extends BufferedInputStream
+    {
+        public GzipBufferedInputStream(InputStream input, int bufferSize)
+        {
+            super(requireNonNull(input, "input is null"), bufferSize);
         }
-        finally {
-            // close() will free the memory
-            input.close();
+
+        @Override
+        public int available()
+                throws IOException
+        {
+            // GZIPInputStream thinks the stream is complete if this returns zero
+            return max(1, super.available());
         }
     }
 }
