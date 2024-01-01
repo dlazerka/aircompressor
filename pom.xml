@@ -11,7 +11,7 @@
     <name>aircompressor</name>
 
     <description>Compression algorithms</description>
-    <url>http://github.com/airlift/aircompressor</url>
+    <url>https://github.com/airlift/aircompressor</url>
 
     <parent>
         <groupId>io.airlift</groupId>
@@ -24,7 +24,7 @@
     <licenses>
         <license>
             <name>Apache License 2.0</name>
-            <url>http://www.apache.org/licenses/LICENSE-2.0.html</url>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.html</url>
             <distribution>repo</distribution>
         </license>
     </licenses>
@@ -32,7 +32,7 @@
     <scm>
         <connection>scm:git:git://github.com/airlift/aircompressor.git</connection>
         <developerConnection>scm:git:git@github.com:airlift/aircompressor.git</developerConnection>
-        <url>http://github.com/airlift/aircompressor/tree/master</url>
+        <url>https://github.com/airlift/aircompressor/tree/master</url>
       <tag>HEAD</tag>
   </scm>
 
