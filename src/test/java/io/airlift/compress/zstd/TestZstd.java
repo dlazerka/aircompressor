@@ -178,8 +178,6 @@ public class TestZstd
 
         int compressedLength = compressor.compress(originalUncompressed, 0, originalUncompressed.length, compressed, 0, compressed.length);
 
-        assertByteArraysEqual(compressed, 0, compressed.length, compressed, 0, compressed.length);
-
         assertEquals(ZstdDecompressor.getDecompressedSize(compressed, 0, compressedLength), originalUncompressed.length);
 
         int padding = 10;
