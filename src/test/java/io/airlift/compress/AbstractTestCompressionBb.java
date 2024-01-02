@@ -158,46 +158,26 @@ public abstract class AbstractTestCompressionBb
                 .isInstanceOf(NullPointerException.class);
     }
 
-    @Test(enabled = false)
+    @Test
     public void testDecompressOutputBoundsChecks()
     {
-        byte[] data = new byte[1024];
-        new Random(1234).nextBytes(data);
+        ByteBuffer data = ByteBuffer.allocate(1024).order(LITTLE_ENDIAN);
+        new Random(1234).nextBytes(data.array());
         Compressor compressor = getCompressor();
-        byte[] compressed = new byte[compressor.maxCompressedLength(data.length)];
-        int compressedLength = compressor.compress(data, 0, data.length, compressed, 0, compressed.length);
-        byte[] input = Arrays.copyOf(compressed, compressedLength);
+        ByteBuffer compressed = ByteBuffer.allocate(compressor.maxCompressedLength(data.remaining()));
+        compressor.compress(data, compressed);
+        int compressedLength = compressed.position();
+        ByteBuffer input = ByteBuffer.wrap(Arrays.copyOf(compressed.array(), compressedLength)).order(LITTLE_ENDIAN);
 
         Decompressor decompressor = getDecompressor();
-        Throwable throwable;
 
         // null output buffer
-        assertThatThrownBy(() -> decompressor.decompress(input, 0, input.length, null, 0, data.length))
+        assertThatThrownBy(() -> decompressor.decompress(input, null))
                 .isInstanceOf(NullPointerException.class);
 
         // small buffer
-        assertThatThrownBy(() -> decompressor.decompress(input, 0, input.length, new byte[1], 0, 1))
+        assertThatThrownBy(() -> decompressor.decompress(input, ByteBuffer.allocate(1)))
                 .hasMessageMatching("All input was not consumed|attempt to write.* outside of destination buffer.*|Malformed input.*|Uncompressed length 1024 must be less than 1|Output buffer too small.*");
-
-        // mis-declared buffer size
-        throwable = catchThrowable(() -> decompressor.decompress(input, 0, input.length, new byte[1], 0, data.length));
-        if (throwable instanceof IndexOutOfBoundsException) {
-            // OK
-        }
-        else {
-            assertThat(throwable)
-                    .hasMessageMatching(".*must not be greater than size.*|Invalid offset or length.*");
-        }
-
-        // mis-declared buffer size with greater buffer
-        throwable = catchThrowable(() -> decompressor.decompress(input, 0, input.length, new byte[data.length - 1], 0, data.length));
-        if (throwable instanceof IndexOutOfBoundsException) {
-            // OK
-        }
-        else {
-            assertThat(throwable)
-                    .hasMessageMatching(".*must not be greater than size.*|Invalid offset or length.*");
-        }
     }
 
     @Test(enabled = false, dataProvider = "data")
