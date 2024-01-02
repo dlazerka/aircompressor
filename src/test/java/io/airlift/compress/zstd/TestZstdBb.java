@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.List;
 
 import static io.airlift.compress.Util.readResource;
 import static io.airlift.compress.Util.readResourceBb;
@@ -88,14 +89,14 @@ public class TestZstdBb
         assertByteArraysEqual(uncompressed, 0, uncompressed.length, output, 0, output.length);
     }
 
-    @Test(enabled = false)
+    @Test
     public void testInvalidSequenceOffset()
             throws IOException
     {
-        byte[] compressed = readResource("data/zstd/offset-before-start.zst");
-        byte[] output = new byte[compressed.length * 10];
+        ByteBuffer compressed = readResourceBb("data/zstd/offset-before-start.zst");
+        ByteBuffer output = ByteBuffer.allocate(compressed.remaining() * 10).order(LITTLE_ENDIAN);
 
-        assertThatThrownBy(() -> getDecompressor().decompress(compressed, 0, compressed.length, output, 0, output.length))
+        assertThatThrownBy(() -> getDecompressor().decompress(compressed, output))
                 .isInstanceOf(MalformedInputException.class)
                 .hasMessageStartingWith("Input is corrupted: offset=894");
     }
