@@ -26,6 +26,7 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 import static io.airlift.compress.Util.readResource;
+import static io.airlift.compress.Util.readResourceBb;
 import static java.nio.ByteOrder.LITTLE_ENDIAN;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.testng.Assert.assertEquals;
@@ -42,7 +43,7 @@ public class TestZstdBb
     @Override
     protected Decompressor getDecompressor()
     {
-        return new ZstdDecompressor();
+        return new ZstdDecompressorBb();
     }
 
     @Override
@@ -188,14 +189,14 @@ public class TestZstdBb
         assertEquals(ZstdDecompressorBb.getDecompressedSize(compressedWithPadding, padding, compressedLength), originalUncompressed.length);
     }
 
-    @Test(enabled = false)
+    @Test
     public void testVerifyMagicInAllFrames()
             throws IOException
     {
-        byte[] compressed = readResource("data/zstd/bad-second-frame.zst");
-        byte[] uncompressed = readResource("data/zstd/multiple-frames");
-        byte[] output = new byte[uncompressed.length];
-        assertThatThrownBy(() -> getDecompressor().decompress(compressed, 0, compressed.length, output, 0, output.length))
+        ByteBuffer compressed = readResourceBb("data/zstd/bad-second-frame.zst");
+        ByteBuffer uncompressed = readResourceBb("data/zstd/multiple-frames");
+        ByteBuffer output = ByteBuffer.allocate(uncompressed.remaining()).order(LITTLE_ENDIAN);
+        assertThatThrownBy(() -> getDecompressor().decompress(compressed, output))
                 .isInstanceOf(MalformedInputException.class)
                 .hasMessageStartingWith("Invalid magic prefix");
     }

@@ -33,15 +33,7 @@ public class ZstdDecompressorBb
     public int decompress(byte[] input, int inputOffset, int inputLength, byte[] output, int outputOffset, int maxOutputLength)
             throws MalformedInputException
     {
-        verifyRange(input, inputOffset, inputLength);
-        verifyRange(output, outputOffset, maxOutputLength);
-
-        long inputAddress = ARRAY_BYTE_BASE_OFFSET + inputOffset;
-        long inputLimit = inputAddress + inputLength;
-        long outputAddress = ARRAY_BYTE_BASE_OFFSET + outputOffset;
-        long outputLimit = outputAddress + maxOutputLength;
-
-        return decompressor.decompress(input, inputAddress, inputLimit, output, outputAddress, outputLimit);
+        throw new IllegalArgumentException("Use ByteBuffer version of decompress() method");
     }
 
     @Override
