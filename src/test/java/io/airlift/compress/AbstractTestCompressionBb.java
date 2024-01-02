@@ -113,7 +113,7 @@ public abstract class AbstractTestCompressionBb
         assertByteBufferEqual(uncompressed, ByteBuffer.wrap(uncompressedOriginal));
     }
 
-    @Test(enabled = false, dataProvider = "data")
+    @Test(dataProvider = "data")
     public void testDecompressionBufferOverrun(DataSet dataSet)
     {
         byte[] uncompressedOriginal = dataSet.getUncompressed();
@@ -123,21 +123,19 @@ public abstract class AbstractTestCompressionBb
         byte[] padding = new byte[100];
         ThreadLocalRandom.current().nextBytes(padding);
 
-        byte[] uncompressed = Bytes.concat(new byte[uncompressedOriginal.length], padding);
+        ByteBuffer uncompressed = ByteBuffer.wrap(Bytes.concat(new byte[uncompressedOriginal.length], padding));
 
         Decompressor decompressor = getDecompressor();
-        int uncompressedSize = decompressor.decompress(
-                compressed.array(),
-                0,
-                compressed.array().length,
-                uncompressed,
-                0,
-                uncompressedOriginal.length);
+        decompressor.decompress(compressed, uncompressed);
+        int uncompressedSize = uncompressed.position();
+        uncompressed.flip(); // limit set to position
 
-        assertByteArraysEqual(uncompressed, 0, uncompressedSize, uncompressedOriginal, 0, uncompressedOriginal.length);
+        assertByteArraysEqual(uncompressed.array(), 0, uncompressedSize, uncompressedOriginal, 0, uncompressedOriginal.length);
+        assertByteBufferEqual(uncompressed, ByteBuffer.wrap(uncompressedOriginal));
 
         // verify padding is intact
-        assertByteArraysEqual(padding, 0, padding.length, uncompressed, uncompressed.length - padding.length, padding.length);
+        uncompressed.limit(uncompressed.capacity()).position(uncompressed.limit() - padding.length);
+        assertByteBufferEqual(ByteBuffer.wrap(padding), uncompressed);
     }
 
     @Test
