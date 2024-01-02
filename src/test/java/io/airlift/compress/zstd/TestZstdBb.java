@@ -201,12 +201,12 @@ public class TestZstdBb
                 .hasMessageStartingWith("Invalid magic prefix");
     }
 
-    @Test(enabled = false)
+    @Test
     public void testDecompressIsMissingData()
     {
-        byte[] input = new byte[]{40, -75, 47, -3, 32, 0, 1, 0};
-        byte[] output = new byte[1024];
-        assertThatThrownBy(() -> getDecompressor().decompress(input, 0, input.length, output, 0, output.length))
+        ByteBuffer input = ByteBuffer.wrap(new byte[]{40, -75, 47, -3, 32, 0, 1, 0});
+        ByteBuffer output = ByteBuffer.allocate(1024).order(LITTLE_ENDIAN);
+        assertThatThrownBy(() -> getDecompressor().decompress(input, output))
                 .matches(e -> e instanceof MalformedInputException || e instanceof UncheckedIOException)
                 .hasMessageContaining("Not enough input bytes");
     }
