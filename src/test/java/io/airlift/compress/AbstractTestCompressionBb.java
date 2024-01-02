@@ -578,7 +578,7 @@ public abstract class AbstractTestCompressionBb
         assertEquals(leftLength, rightLength, String.format("Array lengths differ: %s vs %s", leftLength, rightLength));
     }
 
-    private static void assertByteBufferEqual(ByteBuffer left, ByteBuffer right)
+    public static void assertByteBufferEqual(ByteBuffer left, ByteBuffer right)
     {
         Buffer leftBuffer = left;
         Buffer rightBuffer = right;

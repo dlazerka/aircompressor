@@ -76,17 +76,18 @@ public class TestZstdBb
         assertByteArraysEqual(uncompressed, 0, uncompressed.length, output, padding, decompressedSize);
     }
 
-    @Test(enabled = false)
+    @Test
     public void testConcatenatedFrames()
             throws IOException
     {
-        byte[] compressed = readResource("data/zstd/multiple-frames.zst");
-        byte[] uncompressed = readResource("data/zstd/multiple-frames");
+        ByteBuffer compressed = readResourceBb("data/zstd/multiple-frames.zst");
+        ByteBuffer uncompressed = readResourceBb("data/zstd/multiple-frames");
 
-        byte[] output = new byte[uncompressed.length];
-        getDecompressor().decompress(compressed, 0, compressed.length, output, 0, output.length);
+        ByteBuffer output = ByteBuffer.allocate(uncompressed.remaining()).order(LITTLE_ENDIAN);
+        getDecompressor().decompress(compressed, output);
 
-        assertByteArraysEqual(uncompressed, 0, uncompressed.length, output, 0, output.length);
+        output.rewind();
+        assertByteBufferEqual(uncompressed, output);
     }
 
     @Test
