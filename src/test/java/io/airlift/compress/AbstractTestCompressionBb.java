@@ -82,15 +82,15 @@ public abstract class AbstractTestCompressionBb
             throws Exception
     {
         byte[] uncompressedOriginal = dataSet.getUncompressed();
-        byte[] compressed = prepareCompressedData(uncompressedOriginal);
+        ByteBuffer compressed = prepareCompressedData(uncompressedOriginal);
 
         byte[] uncompressed = new byte[uncompressedOriginal.length];
 
         Decompressor decompressor = getDecompressor();
         int uncompressedSize = decompressor.decompress(
-                compressed,
+                compressed.array(),
                 0,
-                compressed.length,
+                compressed.array().length,
                 uncompressed,
                 0,
                 uncompressed.length);
@@ -105,15 +105,15 @@ public abstract class AbstractTestCompressionBb
         int padding = 1021;
 
         byte[] uncompressedOriginal = dataSet.getUncompressed();
-        byte[] compressed = prepareCompressedData(uncompressedOriginal);
+        ByteBuffer compressed = prepareCompressedData(uncompressedOriginal);
 
         byte[] uncompressed = new byte[uncompressedOriginal.length + 2 * padding]; // pre + post padding
 
         Decompressor decompressor = getDecompressor();
         int uncompressedSize = decompressor.decompress(
-                compressed,
+                compressed.array(),
                 0,
-                compressed.length,
+                compressed.array().length,
                 uncompressed,
                 padding,
                 uncompressedOriginal.length + padding);
@@ -125,7 +125,7 @@ public abstract class AbstractTestCompressionBb
     public void testDecompressionBufferOverrun(DataSet dataSet)
     {
         byte[] uncompressedOriginal = dataSet.getUncompressed();
-        byte[] compressed = prepareCompressedData(uncompressedOriginal);
+        ByteBuffer compressed = prepareCompressedData(uncompressedOriginal);
 
         // add padding with random bytes that we can verify later
         byte[] padding = new byte[100];
@@ -135,9 +135,9 @@ public abstract class AbstractTestCompressionBb
 
         Decompressor decompressor = getDecompressor();
         int uncompressedSize = decompressor.decompress(
-                compressed,
+                compressed.array(),
                 0,
-                compressed.length,
+                compressed.array().length,
                 uncompressed,
                 0,
                 uncompressedOriginal.length);
@@ -190,7 +190,7 @@ public abstract class AbstractTestCompressionBb
 
         byte[] uncompressedOriginal = dataSet.getUncompressed();
 
-        ByteBuffer compressed = ByteBuffer.wrap(prepareCompressedData(uncompressedOriginal));
+        ByteBuffer compressed = prepareCompressedData(uncompressedOriginal);
         ByteBuffer uncompressed = ByteBuffer.allocate(uncompressedOriginal.length);
 
         getDecompressor().decompress(compressed, uncompressed);
@@ -209,7 +209,7 @@ public abstract class AbstractTestCompressionBb
 
         byte[] uncompressedOriginal = dataSet.getUncompressed();
 
-        ByteBuffer compressed = ByteBuffer.wrap(prepareCompressedData(uncompressedOriginal));
+        ByteBuffer compressed = prepareCompressedData(uncompressedOriginal);
         ByteBuffer uncompressed = ByteBuffer.allocateDirect(uncompressedOriginal.length);
 
         getDecompressor().decompress(compressed, uncompressed);
@@ -410,14 +410,14 @@ public abstract class AbstractTestCompressionBb
             throw new SkipException("ByteBuffer not supported");
         }
 
-        byte[] uncompressedOriginal = dataSet.getUncompressed();
+        ByteBuffer uncompressedOriginal = ByteBuffer.wrap(dataSet.getUncompressed());
 
         Compressor compressor = getCompressor();
 
         verifyCompressByteBuffer(
                 compressor,
                 toDirectBuffer(uncompressedOriginal),
-                ByteBuffer.allocate(compressor.maxCompressedLength(uncompressedOriginal.length)));
+                ByteBuffer.allocate(compressor.maxCompressedLength(uncompressedOriginal.remaining())));
     }
 
     @Test(enabled = false, dataProvider = "data")
@@ -428,14 +428,14 @@ public abstract class AbstractTestCompressionBb
             throw new SkipException("ByteBuffer not supported");
         }
 
-        byte[] uncompressedOriginal = dataSet.getUncompressed();
+        ByteBuffer uncompressedOriginal = ByteBuffer.wrap(dataSet.getUncompressed());
 
         Compressor compressor = getCompressor();
 
         verifyCompressByteBuffer(
                 compressor,
                 toDirectBuffer(uncompressedOriginal),
-                ByteBuffer.allocateDirect(compressor.maxCompressedLength(uncompressedOriginal.length)));
+                ByteBuffer.allocateDirect(compressor.maxCompressedLength(uncompressedOriginal.remaining())));
     }
 
     private void verifyCompressByteBuffer(Compressor compressor, ByteBuffer expected, ByteBuffer compressed)
@@ -544,17 +544,17 @@ public abstract class AbstractTestCompressionBb
         assertEquals(leftBuffer.remaining(), rightBuffer.remaining(), String.format("Buffer lengths differ: %s vs %s", leftBuffer.remaining(), leftBuffer.remaining()));
     }
 
-    private static ByteBuffer toDirectBuffer(byte[] data)
+    private static ByteBuffer toDirectBuffer(ByteBuffer data)
     {
-        ByteBuffer direct = ByteBuffer.allocateDirect(data.length);
-        direct.put(data);
+        ByteBuffer direct = ByteBuffer.allocateDirect(data.remaining());
+        direct.put(data.array());
 
         ((Buffer) direct).flip();
 
         return direct;
     }
 
-    private byte[] prepareCompressedData(byte[] uncompressed)
+    private ByteBuffer prepareCompressedData(byte[] uncompressed)
     {
         Compressor compressor = getVerifyCompressor();
 
@@ -568,6 +568,6 @@ public abstract class AbstractTestCompressionBb
                 0,
                 compressed.length);
 
-        return Arrays.copyOf(compressed, compressedLength);
+        return ByteBuffer.wrap(Arrays.copyOf(compressed, compressedLength)).order(LITTLE_ENDIAN);
     }
 }
