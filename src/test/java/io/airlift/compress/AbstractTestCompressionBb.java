@@ -180,7 +180,7 @@ public abstract class AbstractTestCompressionBb
                 .hasMessageMatching("All input was not consumed|attempt to write.* outside of destination buffer.*|Malformed input.*|Uncompressed length 1024 must be less than 1|Output buffer too small.*");
     }
 
-    @Test(enabled = false, dataProvider = "data")
+    @Test(dataProvider = "data")
     public void testDecompressByteBufferHeapToHeap(DataSet dataSet)
             throws Exception
     {
@@ -199,7 +199,7 @@ public abstract class AbstractTestCompressionBb
         assertByteBufferEqual(ByteBuffer.wrap(uncompressedOriginal), uncompressed);
     }
 
-    @Test(enabled = false, dataProvider = "data")
+    @Test(dataProvider = "data")
     public void testDecompressByteBufferHeapToDirect(DataSet dataSet)
             throws Exception
     {
@@ -218,7 +218,7 @@ public abstract class AbstractTestCompressionBb
         assertByteBufferEqual(ByteBuffer.wrap(uncompressedOriginal), uncompressed);
     }
 
-    @Test(enabled = false, dataProvider = "data")
+    @Test(dataProvider = "data")
     public void testDecompressByteBufferDirectToHeap(DataSet dataSet)
             throws Exception
     {
@@ -237,7 +237,7 @@ public abstract class AbstractTestCompressionBb
         assertByteBufferEqual(ByteBuffer.wrap(uncompressedOriginal), uncompressed);
     }
 
-    @Test(enabled = false, dataProvider = "data")
+    @Test(dataProvider = "data")
     public void testDecompressByteBufferDirectToDirect(DataSet dataSet)
             throws Exception
     {
