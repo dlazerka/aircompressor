@@ -93,7 +93,7 @@ public abstract class AbstractTestCompressionBb
     }
 
     // Tests that decompression works correctly when the decompressed data does not span the entire output buffer
-    @Test(enabled = false, dataProvider = "data")
+    @Test(dataProvider = "data")
     public void testDecompressWithOutputPadding(DataSet dataSet)
     {
         int padding = 1021;
@@ -101,18 +101,16 @@ public abstract class AbstractTestCompressionBb
         byte[] uncompressedOriginal = dataSet.getUncompressed();
         ByteBuffer compressed = prepareCompressedData(uncompressedOriginal);
 
-        byte[] uncompressed = new byte[uncompressedOriginal.length + 2 * padding]; // pre + post padding
+        ByteBuffer uncompressed = ByteBuffer.allocate(uncompressedOriginal.length + 2 * padding); // pre + post padding
+        uncompressed.position(padding).limit(uncompressedOriginal.length + padding);
 
         Decompressor decompressor = getDecompressor();
-        int uncompressedSize = decompressor.decompress(
-                compressed.array(),
-                0,
-                compressed.array().length,
-                uncompressed,
-                padding,
-                uncompressedOriginal.length + padding);
 
-        assertByteArraysEqual(uncompressed, padding, uncompressedSize, uncompressedOriginal, 0, uncompressedOriginal.length);
+        uncompressed.mark();
+        decompressor.decompress(compressed, uncompressed);
+        uncompressed.reset(); // to mark
+
+        assertByteBufferEqual(uncompressed, ByteBuffer.wrap(uncompressedOriginal));
     }
 
     @Test(enabled = false, dataProvider = "data")
