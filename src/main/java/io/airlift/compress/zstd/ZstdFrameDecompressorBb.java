@@ -15,6 +15,7 @@ package io.airlift.compress.zstd;
 
 import io.airlift.compress.MalformedInputException;
 
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 import static io.airlift.compress.zstd.BitInputStream.peekBits;
@@ -101,23 +102,23 @@ class ZstdFrameDecompressorBb
     private final FseTableReader fse = new FseTableReader();
 
     public int decompress(
-            final Object inputBase,
-            final long inputAddress,
-            final long inputLimit,
-            final Object outputBase,
-            final long outputAddress,
-            final long outputLimit)
+            final ByteBuffer inputBase,
+            final int inputAddress,
+            final int inputLimit,
+            final ByteBuffer outputBase,
+            final int outputAddress,
+            final int outputLimit)
     {
         if (outputAddress == outputLimit) {
             return 0;
         }
 
-        long input = inputAddress;
-        long output = outputAddress;
+        int input = inputAddress;
+        int output = outputAddress;
 
         while (input < inputLimit) {
             reset();
-            long outputStart = output;
+            int outputStart = output;
             input += verifyMagic(inputBase, input, inputLimit);
 
             FrameHeader frameHeader = readFrameHeader(inputBase, input, inputLimit);
@@ -843,12 +844,12 @@ class ZstdFrameDecompressorBb
         return (int) (input - inputAddress);
     }
 
-    static FrameHeader readFrameHeader(final Object inputBase, final long inputAddress, final long inputLimit)
+    static FrameHeader readFrameHeader(ByteBuffer inputBase, int inputAddress, int inputLimit)
     {
-        long input = inputAddress;
+        int input = inputAddress;
         verify(input < inputLimit, input, "Not enough input bytes");
 
-        int frameHeaderDescriptor = UNSAFE.getByte(inputBase, input++) & 0xFF;
+        int frameHeaderDescriptor = inputBase.get(input++) & 0xFF;
         boolean singleSegment = (frameHeaderDescriptor & 0b100000) != 0;
         int dictionaryDescriptor = frameHeaderDescriptor & 0b11;
         int contentSizeDescriptor = frameHeaderDescriptor >>> 6;
@@ -875,15 +876,15 @@ class ZstdFrameDecompressorBb
         long dictionaryId = -1;
         switch (dictionaryDescriptor) {
             case 1:
-                dictionaryId = UNSAFE.getByte(inputBase, input) & 0xFF;
+                dictionaryId = inputBase.get(input) & 0xFF;
                 input += SIZE_OF_BYTE;
                 break;
             case 2:
-                dictionaryId = UNSAFE.getShort(inputBase, input) & 0xFFFF;
+                dictionaryId = inputBase.getShort(input) & 0xFFFF;
                 input += SIZE_OF_SHORT;
                 break;
             case 3:
-                dictionaryId = UNSAFE.getInt(inputBase, input) & 0xFFFF_FFFFL;
+                dictionaryId = inputBase.getInt(input) & 0xFFFF_FFFFL;
                 input += SIZE_OF_INT;
                 break;
         }
@@ -894,21 +895,21 @@ class ZstdFrameDecompressorBb
         switch (contentSizeDescriptor) {
             case 0:
                 if (singleSegment) {
-                    contentSize = UNSAFE.getByte(inputBase, input) & 0xFF;
+                    contentSize = inputBase.get(input) & 0xFF;
                     input += SIZE_OF_BYTE;
                 }
                 break;
             case 1:
-                contentSize = UNSAFE.getShort(inputBase, input) & 0xFFFF;
+                contentSize = inputBase.getShort(input) & 0xFFFF;
                 contentSize += 256;
                 input += SIZE_OF_SHORT;
                 break;
             case 2:
-                contentSize = UNSAFE.getInt(inputBase, input) & 0xFFFF_FFFFL;
+                contentSize = inputBase.getInt(input) & 0xFFFF_FFFFL;
                 input += SIZE_OF_INT;
                 break;
             case 3:
-                contentSize = UNSAFE.getLong(inputBase, input);
+                contentSize = inputBase.getLong(input);
                 input += SIZE_OF_LONG;
                 break;
         }
@@ -923,18 +924,18 @@ class ZstdFrameDecompressorBb
                 hasChecksum);
     }
 
-    public static long getDecompressedSize(final Object inputBase, final long inputAddress, final long inputLimit)
+    public static long getDecompressedSize(final ByteBuffer inputBase, final int inputAddress, final int inputLimit)
     {
-        long input = inputAddress;
+        int input = inputAddress;
         input += verifyMagic(inputBase, input, inputLimit);
         return readFrameHeader(inputBase, input, inputLimit).contentSize;
     }
 
-    static int verifyMagic(Object inputBase, long inputAddress, long inputLimit)
+    static int verifyMagic(ByteBuffer inputBase, int inputAddress, long inputLimit)
     {
         verify(inputLimit - inputAddress >= 4, inputAddress, "Not enough input bytes");
 
-        int magic = UNSAFE.getInt(inputBase, inputAddress);
+        int magic = inputBase.getInt(inputAddress);
         if (magic != MAGIC_NUMBER) {
             if (magic == V07_MAGIC_NUMBER) {
                 throw new MalformedInputException(inputAddress, "Data encoded in unsupported ZSTD v0.7 format");

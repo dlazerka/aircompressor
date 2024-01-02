@@ -103,10 +103,10 @@ public class ZstdDecompressorBb
         }
     }
 
-    public static long getDecompressedSize(byte[] input, int offset, int length)
+    public static long getDecompressedSize(ByteBuffer input, int offset, int length)
     {
-        int baseAddress = ARRAY_BYTE_BASE_OFFSET + offset;
-        return ZstdFrameDecompressor.getDecompressedSize(input, baseAddress, baseAddress + length);
+        int baseAddress = offset;
+        return ZstdFrameDecompressorBb.getDecompressedSize(input, baseAddress, baseAddress + length);
     }
 
     private static void verifyRange(byte[] data, int offset, int length)

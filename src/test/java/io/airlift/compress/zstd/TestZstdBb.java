@@ -22,9 +22,11 @@ import org.testng.annotations.Test;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 import static io.airlift.compress.Util.readResource;
+import static java.nio.ByteOrder.LITTLE_ENDIAN;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.testng.Assert.assertEquals;
 
@@ -167,24 +169,23 @@ public class TestZstdBb
     }
 
     // test over data sets, should the result depend on input size or its compressibility
-    @Test(enabled = false, dataProvider = "data")
+    @Test(dataProvider = "data")
     public void testGetDecompressedSize(DataSet dataSet)
     {
         Compressor compressor = getCompressor();
         byte[] originalUncompressed = dataSet.getUncompressed();
-        byte[] compressed = new byte[compressor.maxCompressedLength(originalUncompressed.length)];
+        ByteBuffer compressed = ByteBuffer.allocate(compressor.maxCompressedLength(originalUncompressed.length)).order(LITTLE_ENDIAN);
 
-        int compressedLength = compressor.compress(originalUncompressed, 0, originalUncompressed.length, compressed, 0, compressed.length);
+        int compressedLength = compressor.compress(originalUncompressed, 0, originalUncompressed.length, compressed.array(), 0, compressed.remaining());
 
-        assertByteArraysEqual(compressed, 0, compressed.length, compressed, 0, compressed.length);
-
-        assertEquals(ZstdDecompressor.getDecompressedSize(compressed, 0, compressedLength), originalUncompressed.length);
+        assertEquals(ZstdDecompressorBb.getDecompressedSize(compressed, 0, compressedLength), originalUncompressed.length);
 
         int padding = 10;
-        byte[] compressedWithPadding = new byte[compressedLength + padding];
-        Arrays.fill(compressedWithPadding, (byte) 42);
-        System.arraycopy(compressed, 0, compressedWithPadding, padding, compressedLength);
-        assertEquals(ZstdDecompressor.getDecompressedSize(compressedWithPadding, padding, compressedLength), originalUncompressed.length);
+        ByteBuffer compressedWithPadding = ByteBuffer.allocate(compressedLength + padding).order(LITTLE_ENDIAN);
+        Arrays.fill(compressedWithPadding.array(), (byte) 42);
+        System.arraycopy(compressed.array(), 0, compressedWithPadding.array(), padding, compressedLength);
+
+        assertEquals(ZstdDecompressorBb.getDecompressedSize(compressedWithPadding, padding, compressedLength), originalUncompressed.length);
     }
 
     @Test(enabled = false)
