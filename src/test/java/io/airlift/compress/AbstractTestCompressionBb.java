@@ -77,25 +77,19 @@ public abstract class AbstractTestCompressionBb
         testCases.addAll(dataSets);
     }
 
-    @Test(enabled = false, dataProvider = "data")
+    @Test(dataProvider = "data")
     public void testDecompress(DataSet dataSet)
-            throws Exception
     {
         byte[] uncompressedOriginal = dataSet.getUncompressed();
         ByteBuffer compressed = prepareCompressedData(uncompressedOriginal);
 
-        byte[] uncompressed = new byte[uncompressedOriginal.length];
+        ByteBuffer uncompressed = ByteBuffer.allocate(uncompressedOriginal.length).order(LITTLE_ENDIAN);
 
         Decompressor decompressor = getDecompressor();
-        int uncompressedSize = decompressor.decompress(
-                compressed.array(),
-                0,
-                compressed.array().length,
-                uncompressed,
-                0,
-                uncompressed.length);
+        decompressor.decompress(compressed, uncompressed);
+        uncompressed.flip();
 
-        assertByteArraysEqual(uncompressed, 0, uncompressedSize, uncompressedOriginal, 0, uncompressedOriginal.length);
+        assertByteBufferEqual(uncompressed, ByteBuffer.wrap(uncompressedOriginal));
     }
 
     // Tests that decompression works correctly when the decompressed data does not span the entire output buffer
