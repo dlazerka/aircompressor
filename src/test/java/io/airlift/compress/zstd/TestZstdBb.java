@@ -17,14 +17,12 @@ import io.airlift.compress.*;
 import io.airlift.compress.benchmark.DataSet;
 import io.airlift.compress.thirdparty.ZstdJniCompressor;
 import io.airlift.compress.thirdparty.ZstdJniDecompressor;
-import io.trino.hadoop.$internal.com.microsoft.azure.storage.table.Ignore;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import java.util.List;
 
 import static io.airlift.compress.Util.readResource;
 import static io.airlift.compress.Util.readResourceBb;
@@ -61,19 +59,23 @@ public class TestZstdBb
 
     // Ideally, this should be covered by super.testDecompressWithOutputPadding(...), but the data written by the native
     // compressor doesn't include checksums, so it's not a comprehensive test. The dataset for this test has a checksum.
-    @Test(enabled = false)
+    @Test
     public void testDecompressWithOutputPaddingAndChecksum()
             throws IOException
     {
         int padding = 1021;
 
-        byte[] compressed = readResource("data/zstd/with-checksum.zst");
-        byte[] uncompressed = readResource("data/zstd/with-checksum");
+        ByteBuffer compressed = readResourceBb("data/zstd/with-checksum.zst");
+        ByteBuffer uncompressed = readResourceBb("data/zstd/with-checksum");
 
-        byte[] output = new byte[uncompressed.length + padding * 2]; // pre + post padding
-        int decompressedSize = getDecompressor().decompress(compressed, 0, compressed.length, output, padding, output.length - padding);
+        ByteBuffer output = ByteBuffer.allocate(uncompressed.remaining() + padding * 2); // pre + post padding
+        output.position(padding);
+        getDecompressor().decompress(compressed, output);
+        int decompressedSize = output.position() - padding;
 
-        assertByteArraysEqual(uncompressed, 0, uncompressed.length, output, padding, decompressedSize);
+        output.position(padding);
+        output.limit(decompressedSize + padding);
+        assertByteBufferEqual(uncompressed, output);
     }
 
     @Test
