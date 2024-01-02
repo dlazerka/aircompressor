@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -33,6 +34,7 @@ import java.util.concurrent.ThreadLocalRandom;
 
 import static com.google.common.base.Preconditions.checkPositionIndexes;
 import static java.lang.System.arraycopy;
+import static java.nio.ByteOrder.LITTLE_ENDIAN;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.*;
 import static org.testng.Assert.assertEquals;
@@ -146,45 +148,14 @@ public abstract class AbstractTestCompressionBb
         assertByteArraysEqual(padding, 0, padding.length, uncompressed, uncompressed.length - padding.length, padding.length);
     }
 
-    @Test(enabled = false)
-    public void testDecompressInputBoundsChecks()
+    @Test
+    public void testDecompressNull()
     {
-        byte[] data = new byte[1024];
-        new Random(1234).nextBytes(data);
-        Compressor compressor = getCompressor();
-        byte[] compressed = new byte[compressor.maxCompressedLength(data.length)];
-        int compressedLength = compressor.compress(data, 0, data.length, compressed, 0, compressed.length);
-
         Decompressor decompressor = getDecompressor();
-        Throwable throwable;
 
         // null input buffer
-        assertThatThrownBy(() -> decompressor.decompress(null, 0, compressedLength, data, 0, data.length))
+        assertThatThrownBy(() -> decompressor.decompress(null, ByteBuffer.allocate(1024)))
                 .isInstanceOf(NullPointerException.class);
-
-        // mis-declared buffer size
-        byte[] compressedChoppedOff = Arrays.copyOf(compressed, compressedLength - 1);
-        throwable = catchThrowable(() -> decompressor.decompress(compressedChoppedOff, 0, compressedLength, data, 0, data.length));
-        if (throwable instanceof UncheckedIOException) {
-            // OK
-        }
-        else {
-            assertThat(throwable)
-                    .hasMessageMatching(".*must not be greater than size.*|Invalid offset or length.*");
-        }
-
-        // overrun because of offset
-        byte[] compressedWithPadding = new byte[10 + compressedLength - 1];
-        arraycopy(compressed, 0, compressedWithPadding, 10, compressedLength - 1);
-
-        throwable = catchThrowable(() -> decompressor.decompress(compressedWithPadding, 10, compressedLength, data, 0, data.length));
-        if (throwable instanceof UncheckedIOException) {
-            // OK
-        }
-        else {
-            assertThat(throwable)
-                    .hasMessageMatching(".*must not be greater than size.*|Invalid offset or length.*");
-        }
     }
 
     @Test(enabled = false)
@@ -544,8 +515,7 @@ public abstract class AbstractTestCompressionBb
 
                 assertByteArraysEqual(data, 0, i, uncompressed, 0, decompressedSize);
                 assertEquals(decompressedSize, i);
-            }
-            catch (MalformedInputException e) {
+            } catch (MalformedInputException e) {
                 throw new RuntimeException("Failed with " + i + " bytes of input", e);
             }
         }
@@ -558,7 +528,7 @@ public abstract class AbstractTestCompressionBb
         Object[][] result = new Object[testCases.size()][];
 
         for (int i = 0; i < testCases.size(); i++) {
-            result[i] = new Object[] {testCases.get(i)};
+            result[i] = new Object[]{testCases.get(i)};
         }
 
         return result;
