@@ -37,10 +37,11 @@
   </scm>
 
     <properties>
-        <air.java.version>17</air.java.version>
-        <project.build.targetJdk>17</project.build.targetJdk>
+        <air.java.version>11</air.java.version>
+        <project.build.targetJdk>11</project.build.targetJdk>
         <air.check.skip-extended>true</air.check.skip-extended>
         <air.check.skip-license>false</air.check.skip-license>
+        <air.license.skip-existing-headers>true</air.license.skip-existing-headers>
         <air.check.fail-checkstyle>true</air.check.fail-checkstyle>
         <air.check.skip-checkstyle>false</air.check.skip-checkstyle>
 
