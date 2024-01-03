@@ -458,9 +458,8 @@ public abstract class AbstractTestCompressionBb
         assertByteArraysEqual(uncompressed, 0, uncompressedSize, originalUncompressed, 0, originalUncompressed.length);
     }
 
-    @Test(enabled = false)
+    @Test
     public void testRoundTripSmallLiteral()
-            throws Exception
     {
         byte[] data = new byte[256];
         for (int i = 0; i < data.length; i++) {
@@ -468,23 +467,22 @@ public abstract class AbstractTestCompressionBb
         }
 
         Compressor compressor = getCompressor();
-        byte[] compressed = new byte[compressor.maxCompressedLength(data.length)];
-        byte[] uncompressed = new byte[data.length];
+        ByteBuffer compressed = ByteBuffer.allocate(compressor.maxCompressedLength(data.length));
+        ByteBuffer uncompressed = ByteBuffer.allocate(data.length);
 
         for (int i = 1; i < data.length; i++) {
+            ByteBuffer in = ByteBuffer.wrap(data, 0, i);
             try {
-                int written = compressor.compress(
-                        data,
-                        0,
-                        i,
-                        compressed,
-                        0,
-                        compressed.length);
+                compressed.clear();
+                compressor.compress(in, compressed);
+                compressed.flip();
 
-                int decompressedSize = getDecompressor().decompress(compressed, 0, written, uncompressed, 0, uncompressed.length);
+                uncompressed.clear();
+                getDecompressor().decompress(compressed, uncompressed);
+                uncompressed.flip();
 
-                assertByteArraysEqual(data, 0, i, uncompressed, 0, decompressedSize);
-                assertEquals(decompressedSize, i);
+                assertByteBufferEqual(in, uncompressed);
+                assertEquals(uncompressed.limit(), i);
             } catch (MalformedInputException e) {
                 throw new RuntimeException("Failed with " + i + " bytes of input", e);
             }
