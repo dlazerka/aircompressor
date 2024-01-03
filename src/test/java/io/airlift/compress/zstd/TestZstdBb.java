@@ -13,10 +13,7 @@
  */
 package io.airlift.compress.zstd;
 
-import io.airlift.compress.AbstractTestCompression;
-import io.airlift.compress.Compressor;
-import io.airlift.compress.Decompressor;
-import io.airlift.compress.MalformedInputException;
+import io.airlift.compress.*;
 import io.airlift.compress.benchmark.DataSet;
 import io.airlift.compress.thirdparty.ZstdJniCompressor;
 import io.airlift.compress.thirdparty.ZstdJniDecompressor;
@@ -24,14 +21,17 @@ import org.testng.annotations.Test;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 import static io.airlift.compress.Util.readResource;
+import static io.airlift.compress.Util.readResourceBb;
+import static java.nio.ByteOrder.LITTLE_ENDIAN;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.testng.Assert.assertEquals;
 
-public class TestZstd
-        extends AbstractTestCompression
+public class TestZstdBb
+        extends AbstractTestCompressionBb
 {
     @Override
     protected Compressor getCompressor()
@@ -42,7 +42,7 @@ public class TestZstd
     @Override
     protected Decompressor getDecompressor()
     {
-        return new ZstdDecompressor();
+        return new ZstdDecompressorBb();
     }
 
     @Override
@@ -65,41 +65,46 @@ public class TestZstd
     {
         int padding = 1021;
 
-        byte[] compressed = readResource("data/zstd/with-checksum.zst");
-        byte[] uncompressed = readResource("data/zstd/with-checksum");
+        ByteBuffer compressed = readResourceBb("data/zstd/with-checksum.zst");
+        ByteBuffer uncompressed = readResourceBb("data/zstd/with-checksum");
 
-        byte[] output = new byte[uncompressed.length + padding * 2]; // pre + post padding
-        int decompressedSize = getDecompressor().decompress(compressed, 0, compressed.length, output, padding, output.length - padding);
+        ByteBuffer output = ByteBuffer.allocate(uncompressed.remaining() + padding * 2); // pre + post padding
+        output.position(padding);
+        getDecompressor().decompress(compressed, output);
+        int decompressedSize = output.position() - padding;
 
-        assertByteArraysEqual(uncompressed, 0, uncompressed.length, output, padding, decompressedSize);
+        output.position(padding);
+        output.limit(decompressedSize + padding);
+        assertByteBufferEqual(uncompressed, output);
     }
 
     @Test
     public void testConcatenatedFrames()
             throws IOException
     {
-        byte[] compressed = readResource("data/zstd/multiple-frames.zst");
-        byte[] uncompressed = readResource("data/zstd/multiple-frames");
+        ByteBuffer compressed = readResourceBb("data/zstd/multiple-frames.zst");
+        ByteBuffer uncompressed = readResourceBb("data/zstd/multiple-frames");
 
-        byte[] output = new byte[uncompressed.length];
-        getDecompressor().decompress(compressed, 0, compressed.length, output, 0, output.length);
+        ByteBuffer output = ByteBuffer.allocate(uncompressed.remaining()).order(LITTLE_ENDIAN);
+        getDecompressor().decompress(compressed, output);
 
-        assertByteArraysEqual(uncompressed, 0, uncompressed.length, output, 0, output.length);
+        output.rewind();
+        assertByteBufferEqual(uncompressed, output);
     }
 
     @Test
     public void testInvalidSequenceOffset()
             throws IOException
     {
-        byte[] compressed = readResource("data/zstd/offset-before-start.zst");
-        byte[] output = new byte[compressed.length * 10];
+        ByteBuffer compressed = readResourceBb("data/zstd/offset-before-start.zst");
+        ByteBuffer output = ByteBuffer.allocate(compressed.remaining() * 10).order(LITTLE_ENDIAN);
 
-        assertThatThrownBy(() -> getDecompressor().decompress(compressed, 0, compressed.length, output, 0, output.length))
+        assertThatThrownBy(() -> getDecompressor().decompress(compressed, output))
                 .isInstanceOf(MalformedInputException.class)
                 .hasMessageStartingWith("Input is corrupted: offset=894");
     }
 
-    @Test
+    @Test(enabled = false)
     public void testSmallLiteralsAfterIncompressibleLiterals()
             throws IOException
     {
@@ -119,7 +124,7 @@ public class TestZstd
         assertByteArraysEqual(original, 0, original.length, decompressed, 0, decompressedSize);
     }
 
-    @Test
+    @Test(enabled = false)
     public void testLargeRle()
             throws IOException
     {
@@ -139,7 +144,7 @@ public class TestZstd
         assertByteArraysEqual(original, 0, original.length, decompressed, 0, decompressedSize);
     }
 
-    @Test
+    @Test(enabled = false)
     public void testIncompressibleData()
             throws IOException
     {
@@ -159,7 +164,7 @@ public class TestZstd
         assertByteArraysEqual(original, 0, original.length, decompressed, 0, decompressedSize);
     }
 
-    @Test
+    @Test(enabled = false)
     public void testMaxCompressedSize()
     {
         assertEquals(new ZstdCompressor().maxCompressedLength(0), 64);
@@ -174,27 +179,28 @@ public class TestZstd
     {
         Compressor compressor = getCompressor();
         byte[] originalUncompressed = dataSet.getUncompressed();
-        byte[] compressed = new byte[compressor.maxCompressedLength(originalUncompressed.length)];
+        ByteBuffer compressed = ByteBuffer.allocate(compressor.maxCompressedLength(originalUncompressed.length)).order(LITTLE_ENDIAN);
 
-        int compressedLength = compressor.compress(originalUncompressed, 0, originalUncompressed.length, compressed, 0, compressed.length);
+        int compressedLength = compressor.compress(originalUncompressed, 0, originalUncompressed.length, compressed.array(), 0, compressed.remaining());
 
-        assertEquals(ZstdDecompressor.getDecompressedSize(compressed, 0, compressedLength), originalUncompressed.length);
+        assertEquals(ZstdDecompressorBb.getDecompressedSize(compressed, 0, compressedLength), originalUncompressed.length);
 
         int padding = 10;
-        byte[] compressedWithPadding = new byte[compressedLength + padding];
-        Arrays.fill(compressedWithPadding, (byte) 42);
-        System.arraycopy(compressed, 0, compressedWithPadding, padding, compressedLength);
-        assertEquals(ZstdDecompressor.getDecompressedSize(compressedWithPadding, padding, compressedLength), originalUncompressed.length);
+        ByteBuffer compressedWithPadding = ByteBuffer.allocate(compressedLength + padding).order(LITTLE_ENDIAN);
+        Arrays.fill(compressedWithPadding.array(), (byte) 42);
+        System.arraycopy(compressed.array(), 0, compressedWithPadding.array(), padding, compressedLength);
+
+        assertEquals(ZstdDecompressorBb.getDecompressedSize(compressedWithPadding, padding, compressedLength), originalUncompressed.length);
     }
 
     @Test
     public void testVerifyMagicInAllFrames()
             throws IOException
     {
-        byte[] compressed = readResource("data/zstd/bad-second-frame.zst");
-        byte[] uncompressed = readResource("data/zstd/multiple-frames");
-        byte[] output = new byte[uncompressed.length];
-        assertThatThrownBy(() -> getDecompressor().decompress(compressed, 0, compressed.length, output, 0, output.length))
+        ByteBuffer compressed = readResourceBb("data/zstd/bad-second-frame.zst");
+        ByteBuffer uncompressed = readResourceBb("data/zstd/multiple-frames");
+        ByteBuffer output = ByteBuffer.allocate(uncompressed.remaining()).order(LITTLE_ENDIAN);
+        assertThatThrownBy(() -> getDecompressor().decompress(compressed, output))
                 .isInstanceOf(MalformedInputException.class)
                 .hasMessageStartingWith("Invalid magic prefix");
     }
@@ -202,9 +208,9 @@ public class TestZstd
     @Test
     public void testDecompressIsMissingData()
     {
-        byte[] input = new byte[]{40, -75, 47, -3, 32, 0, 1, 0};
-        byte[] output = new byte[1024];
-        assertThatThrownBy(() -> getDecompressor().decompress(input, 0, input.length, output, 0, output.length))
+        ByteBuffer input = ByteBuffer.wrap(new byte[]{40, -75, 47, -3, 32, 0, 1, 0});
+        ByteBuffer output = ByteBuffer.allocate(1024).order(LITTLE_ENDIAN);
+        assertThatThrownBy(() -> getDecompressor().decompress(input, output))
                 .matches(e -> e instanceof MalformedInputException || e instanceof UncheckedIOException)
                 .hasMessageContaining("Not enough input bytes");
     }

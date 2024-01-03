@@ -15,10 +15,12 @@ package io.airlift.compress;
 
 import java.io.IOException;
 import java.net.URL;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static java.lang.String.format;
+import static java.nio.ByteOrder.LITTLE_ENDIAN;
 import static java.util.Objects.requireNonNull;
 
 public final class Util
@@ -59,5 +61,13 @@ public final class Util
     {
         Path path = getResourceAsPath(resourcePath);
         return Files.readAllBytes(path);
+    }
+
+    /**
+     * Reads data from classloader resources as a {@link ByteBuffer}.
+     */
+    public static ByteBuffer readResourceBb(String filePath) throws IOException
+    {
+        return ByteBuffer.wrap(readResource(filePath)).order(LITTLE_ENDIAN);
     }
 }
